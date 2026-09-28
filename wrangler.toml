@@ -1,9 +1,8 @@
 # Хичээлийн үнэлгээ — one Worker serves the website (public/) and the API (/api/*).
 #
-# This is the TEST setup on the personal Cloudflare account. It deploys as a
-# NEW Worker called "mnsa-course", so the live site (mongol-course-frontend +
-# mongol-course-api on course.icpsd.org) keeps running untouched until cutover.
-# See README.md for the full steps.
+# This is the LIVE site (course.icpsd.org) on the personal Cloudflare account.
+# The old Workers (mongol-course-frontend + mongol-course-api) are retired.
+# See README.md for moving it to the student association's account.
 
 name = "mnsa-course"
 main = "src/index.js"
@@ -11,6 +10,13 @@ compatibility_date = "2025-09-01"
 
 # Gives the test site a free address: https://mnsa-course.<your-subdomain>.workers.dev
 workers_dev = true
+
+# Live address. (Attached in the dashboard at cutover; listed here so every
+# `npm run deploy` keeps the domain on this Worker.) Must stay above the
+# first [section] below, or TOML would read it as part of that section.
+routes = [
+  { pattern = "course.icpsd.org", custom_domain = true }
+]
 
 # Static files. Only what is inside public/ is published — nothing else in the
 # repo (wrangler.toml, migrations, README…) can leak onto the website.
@@ -38,9 +44,3 @@ database_name = "mnsa-course-db"
 # Paste the id printed by `npx wrangler d1 create mnsa-course-db` (README step 2).
 database_id = "a869fccf-ac04-4268-aef8-75005ac60d91"
 migrations_dir = "migrations"
-
-# Custom domain — add only at cutover (README step 6), after the old Workers
-# have released course.icpsd.org:
-# routes = [
-#   { pattern = "course.icpsd.org", custom_domain = true }
-# ]
