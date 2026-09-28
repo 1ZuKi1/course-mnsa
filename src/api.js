@@ -352,8 +352,13 @@ export async function handleApi(request, env) {
         if (!name_cn) {
           return Response.json({ success: false, error: 'Хичээлийн нэр оруулна уу' }, { status: 400, headers: corsHeaders });
         }
-        if (credits !== null && (isNaN(credits) || credits < 0 || credits > 30)) {
-          return Response.json({ success: false, error: 'Кредит буруу байна' }, { status: 400, headers: corsHeaders });
+        // Teacher and credits are required: without them the course card
+        // can't tell students which class (and how much load) this is.
+        if (!teacher) {
+          return Response.json({ success: false, error: 'Багшийн нэрийг оруулна уу' }, { status: 400, headers: corsHeaders });
+        }
+        if (credits === null || isNaN(credits) || credits <= 0 || credits > 30) {
+          return Response.json({ success: false, error: 'Кредитийг зөв оруулна уу' }, { status: 400, headers: corsHeaders });
         }
         // Same name + same teacher is treated as the same course, so two
         // students adding it independently can't create duplicate entries.

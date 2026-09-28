@@ -1123,6 +1123,17 @@ async function submitNewCourse() {
     return;
   }
   const teacher = newCourseTeacher.value.trim();
+  if (!teacher) {
+    showToast('Багшийн нэрийг оруулна уу', 'error');
+    newCourseTeacher.focus();
+    return;
+  }
+  const credits = Number(newCourseCredits.value);
+  if (newCourseCredits.value.trim() === '' || isNaN(credits) || credits <= 0 || credits > 30) {
+    showToast('Кредитийг оруулна уу (жишээ нь 2)', 'error');
+    newCourseCredits.focus();
+    return;
+  }
   // Catch the obvious duplicate before a round trip; the API checks too.
   const existing = allCourses.find(c =>
     (c.name_cn || '').trim().toLowerCase() === name_cn.toLowerCase() &&
