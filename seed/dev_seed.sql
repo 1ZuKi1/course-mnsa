@@ -12,7 +12,12 @@ INSERT OR IGNORE INTO courses (id, name_cn, teacher, credits, semester, category
   (5, '中国对外经贸战略', NULL, 2, '秋季', '与中国有关课程'),
   (6, '（测试）通识课示例一', NULL, 2, '秋季', '通识课一'),
   (7, '（测试）通识课示例三', NULL, 2, '春季', '通识课三'),
-  (8, '（测试）羽毛球', NULL, 1, '秋季', '体育课');
+  (8, '（测试）羽毛球', NULL, 1, '秋季', '体育课'),
+  (9, '（测试）中文工具书', '张老师', 2, '秋季', '与中国有关课程');
+
+-- A course taught by several teachers (co-teachers of one class = one entry).
+INSERT OR IGNORE INTO course_teachers (course_id, teacher) VALUES
+  (9, '张老师'), (9, '李老师'), (9, '王老师、赵老师');
 
 INSERT OR IGNORE INTO reviews (course_id, author_id, content_score, workload_score, grading_score, final, attendance, grading_ratio, comment, is_anonymous, taken_semester) VALUES
   (2, 'dev-user-1', 2, 3, 9, '开卷，可用电子产品', 'Хичээл бүр нэр дууддаг', '考勤+小组pre+开卷期末考试', 'Туршилтын сэтгэгдэл: дүнгээ сайн өгсөн, шалгалтад бэлдэх шаардлагагүй.', 0, '2024 秋季'),

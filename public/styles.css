@@ -189,6 +189,15 @@ a { color: var(--accent); }
   .category-filter::-webkit-scrollbar { display: none; }
   .cat-btn { flex-shrink: 0; }
 }
+.teacher-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.teacher-filter[hidden] { display: none; }
+.teacher-filter .cat-btn { min-height: 38px; padding: 6px 12px; }
+.teacher-filter .cat-btn .icon { color: currentColor; opacity: 0.8; }
+.review-teacher {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 2px;
+  font-size: 14px; font-weight: 600; color: var(--accent-ink);
+}
+#teacherField[hidden] { display: none; }
 .list-toolbar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   margin-bottom: 16px;

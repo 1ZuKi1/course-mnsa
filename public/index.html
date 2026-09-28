@@ -110,6 +110,9 @@
       <div class="modal-body">
 
         <!-- Average of each score across the loaded reviews (filled by app.js) -->
+        <!-- Only for courses with several teachers: filters the scores and reviews -->
+        <div class="teacher-filter" id="teacherFilter" role="group" aria-label="Багш" hidden></div>
+
         <div class="summary" id="courseSummary" hidden></div>
 
         <h3 class="section-heading">
@@ -146,6 +149,13 @@
               添加评价
             </h3>
             <p class="form-hint">打 3 个分数就能提交，其余都是选填</p>
+
+            <!-- Shown only when the course has several teachers; then required -->
+            <div class="form-group" id="teacherField" hidden>
+              <label for="formTeacher">Багш</label>
+              <select id="formTeacher" aria-required="true"></select>
+              <small class="field-help">Энэ хичээлийг хэд хэдэн багш заадаг — аль багштай үзсэнээ сонгоно уу</small>
+            </div>
 
             <!-- 三个评分：电脑上是 0–10 按钮，手机上是滑块。滑块 input 是唯一的数据来源 -->
             <fieldset class="score-field">

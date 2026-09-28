@@ -280,6 +280,29 @@ export async function handleApi(request, env) {
         return payload ? payload.sub : null;
       };
 
+      // Teachers of a course, in the order they were added. A course can have
+      // several (different sections); co-teachers of one class are ONE entry
+      // such as "孟庆楠、白辉洪".
+      const getCourseTeachers = async (courseId) => {
+        const { results } = await db.prepare(
+          'SELECT teacher FROM course_teachers WHERE course_id = ? ORDER BY id'
+        ).bind(Number(courseId)).all();
+        if (results.length) return results.map(r => r.teacher);
+        const c = await db.prepare('SELECT teacher FROM courses WHERE id = ?').bind(Number(courseId)).first();
+        return c && c.teacher ? [c.teacher] : [];
+      };
+
+      // The review's teacher: required when the course has several, filled in
+      // automatically when it has one. Returns { teacher } or { error }.
+      const resolveReviewTeacher = async (courseId, chosen) => {
+        const teachers = await getCourseTeachers(courseId);
+        const t = (chosen || '').trim();
+        if (teachers.length <= 1) return { teacher: teachers[0] || null };
+        if (!t) return { error: 'Багшаа сонгоно уу' };
+        if (!teachers.includes(t)) return { error: 'Энэ багш энэ хичээлд байхгүй байна' };
+        return { teacher: t };
+      };
+
       // Courses
       if (path === '/api/courses' && method === 'GET') {
         // review_count / avg_score are aggregated from reviews so the most-
@@ -296,6 +319,9 @@ export async function handleApi(request, env) {
         }
         const sql = `
           SELECT c.*,
+            (SELECT GROUP_CONCAT(teacher, '||') FROM
+               (SELECT teacher FROM course_teachers ct WHERE ct.course_id = c.id ORDER BY ct.id)
+            ) AS teacher_list,
             COALESCE(rv.review_count, 0) AS review_count,
             rv.avg_score AS avg_score
           FROM courses c
@@ -325,7 +351,11 @@ export async function handleApi(request, env) {
           ORDER BY review_count DESC, c.id ASC
         `;
         const { results } = await db.prepare(sql).bind(...params).all();
-        return Response.json({ success: true, data: results }, { headers: corsHeaders });
+        const data = results.map(({ teacher_list, ...c }) => ({
+          ...c,
+          teachers: teacher_list ? teacher_list.split('||') : (c.teacher ? [c.teacher] : []),
+        }));
+        return Response.json({ success: true, data }, { headers: corsHeaders });
       }
 
       // Add course (students can fill in courses missing from the list)
@@ -360,22 +390,36 @@ export async function handleApi(request, env) {
         if (credits === null || isNaN(credits) || credits <= 0 || credits > 30) {
           return Response.json({ success: false, error: 'Кредитийг зөв оруулна уу' }, { status: 400, headers: corsHeaders });
         }
-        // Same name + same teacher is treated as the same course, so two
-        // students adding it independently can't create duplicate entries.
-        const dup = await db.prepare(
-          'SELECT id FROM courses WHERE TRIM(LOWER(name_cn)) = ? AND TRIM(LOWER(IFNULL(teacher, ""))) = ? LIMIT 1'
-        ).bind(name_cn.toLowerCase(), teacher.toLowerCase()).first();
-        if (dup) {
-          return Response.json({
-            success: false,
-            error: 'Ийм хичээл аль хэдийн бүртгэгдсэн байна',
-            data: { id: dup.id, duplicate: true },
-          }, { status: 409, headers: corsHeaders });
+        // One course per name. A course that already exists with another
+        // teacher gets that teacher added instead of a second card; the same
+        // name + teacher is a duplicate.
+        const same = await db.prepare(
+          'SELECT id FROM courses WHERE TRIM(LOWER(name_cn)) = ? ORDER BY id LIMIT 1'
+        ).bind(name_cn.toLowerCase()).first();
+        if (same) {
+          const teachers = await getCourseTeachers(same.id);
+          if (teachers.some(t => t.trim().toLowerCase() === teacher.toLowerCase())) {
+            return Response.json({
+              success: false,
+              error: 'Ийм хичээл аль хэдийн бүртгэгдсэн байна',
+              data: { id: same.id, duplicate: true },
+            }, { status: 409, headers: corsHeaders });
+          }
+          // Courses created before teacher lists existed keep their teacher
+          // only on the course row — copy it over first so it isn't lost.
+          const stored = await db.prepare('SELECT COUNT(*) AS n FROM course_teachers WHERE course_id = ?').bind(same.id).first();
+          if (!stored.n && teachers.length) {
+            await db.prepare('INSERT OR IGNORE INTO course_teachers (course_id, teacher) VALUES (?, ?)').bind(same.id, teachers[0]).run();
+          }
+          await db.prepare('INSERT OR IGNORE INTO course_teachers (course_id, teacher) VALUES (?, ?)').bind(same.id, teacher).run();
+          return Response.json({ success: true, data: { id: same.id, added_teacher: true } }, { headers: corsHeaders });
         }
         const result = await db.prepare(
           'INSERT INTO courses (name_cn, name_en, teacher, credits, semester, category) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(name_cn, name_en || null, teacher || null, credits, semester || null, category).run();
-        return Response.json({ success: true, data: { id: result.meta.last_row_id } }, { headers: corsHeaders });
+        ).bind(name_cn, name_en || null, teacher, credits, semester || null, category).run();
+        const newId = result.meta.last_row_id;
+        await db.prepare('INSERT OR IGNORE INTO course_teachers (course_id, teacher) VALUES (?, ?)').bind(newId, teacher).run();
+        return Response.json({ success: true, data: { id: newId } }, { headers: corsHeaders });
       }
 
       // Reviews
@@ -422,10 +466,14 @@ export async function handleApi(request, env) {
         const {
           course_id, content_score, workload_score, grading_score,
           midterm, final, homework, attendance, groupwork, bigassignment,
-          grading_ratio, comment, is_anonymous, taken_semester
+          grading_ratio, comment, is_anonymous, taken_semester, teacher: chosenTeacher
         } = body;
         if (!course_id) {
           return Response.json({ success: false, error: 'Хичээл сонгоно уу' }, { status: 400, headers: corsHeaders });
+        }
+        const picked = await resolveReviewTeacher(course_id, chosenTeacher);
+        if (picked.error) {
+          return Response.json({ success: false, error: picked.error }, { status: 400, headers: corsHeaders });
         }
 
         // One review per person per course. A repeat submission updates the
@@ -441,13 +489,13 @@ export async function handleApi(request, env) {
               content_score = ?, workload_score = ?, grading_score = ?,
               midterm = ?, final = ?, homework = ?, attendance = ?,
               groupwork = ?, bigassignment = ?, grading_ratio = ?, comment = ?,
-              is_anonymous = ?, taken_semester = ?, updated_at = CURRENT_TIMESTAMP
+              is_anonymous = ?, taken_semester = ?, teacher = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
           `).bind(
             content_score ?? null, workload_score ?? null, grading_score ?? null,
             midterm || null, final || null, homework || null, attendance || null,
             groupwork || null, bigassignment || null, grading_ratio || null, comment || null,
-            is_anonymous ? 1 : 0, taken_semester || null,
+            is_anonymous ? 1 : 0, taken_semester || null, picked.teacher,
             mine.id
           ).run();
           return Response.json({ success: true, data: { id: mine.id, updated: true } }, { headers: corsHeaders });
@@ -456,14 +504,14 @@ export async function handleApi(request, env) {
         const result = await db.prepare(`
           INSERT INTO reviews (course_id, author_id, content_score, workload_score, grading_score,
             midterm, final, homework, attendance, groupwork, bigassignment, grading_ratio, comment,
-            is_anonymous, taken_semester)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            is_anonymous, taken_semester, teacher)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           Number(course_id), userId,
           content_score ?? null, workload_score ?? null, grading_score ?? null,
           midterm || null, final || null, homework || null, attendance || null,
           groupwork || null, bigassignment || null, grading_ratio || null, comment || null,
-          is_anonymous ? 1 : 0, taken_semester || null
+          is_anonymous ? 1 : 0, taken_semester || null, picked.teacher
         ).run();
         return Response.json({ success: true, data: { id: result.meta.last_row_id } }, { headers: corsHeaders });
       }
@@ -477,7 +525,7 @@ export async function handleApi(request, env) {
         if (!reviewId) {
           return Response.json({ success: false, error: 'Үнэлгээний ID оруулна уу' }, { status: 400, headers: corsHeaders });
         }
-        const existing = await db.prepare('SELECT author_id FROM reviews WHERE id = ?').bind(Number(reviewId)).first();
+        const existing = await db.prepare('SELECT author_id, course_id FROM reviews WHERE id = ?').bind(Number(reviewId)).first();
         if (!existing) {
           return Response.json({ success: false, error: 'Үнэлгээ олдсонгүй' }, { status: 404, headers: corsHeaders });
         }
@@ -488,20 +536,24 @@ export async function handleApi(request, env) {
         const {
           content_score, workload_score, grading_score,
           midterm, final, homework, attendance, groupwork, bigassignment,
-          grading_ratio, comment, is_anonymous, taken_semester
+          grading_ratio, comment, is_anonymous, taken_semester, teacher: chosenTeacher
         } = body;
+        const picked = await resolveReviewTeacher(existing.course_id, chosenTeacher);
+        if (picked.error) {
+          return Response.json({ success: false, error: picked.error }, { status: 400, headers: corsHeaders });
+        }
         await db.prepare(`
           UPDATE reviews SET
             content_score = ?, workload_score = ?, grading_score = ?,
             midterm = ?, final = ?, homework = ?, attendance = ?,
             groupwork = ?, bigassignment = ?, grading_ratio = ?, comment = ?,
-            is_anonymous = ?, taken_semester = ?, updated_at = CURRENT_TIMESTAMP
+            is_anonymous = ?, taken_semester = ?, teacher = ?, updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `).bind(
           content_score ?? null, workload_score ?? null, grading_score ?? null,
           midterm || null, final || null, homework || null, attendance || null,
           groupwork || null, bigassignment || null, grading_ratio || null, comment || null,
-          is_anonymous ? 1 : 0, taken_semester || null,
+          is_anonymous ? 1 : 0, taken_semester || null, picked.teacher,
           Number(reviewId)
         ).run();
         return Response.json({ success: true }, { headers: corsHeaders });

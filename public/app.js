@@ -80,6 +80,11 @@ const modalTitle = document.getElementById('modalTitle');
 const modalSub = document.getElementById('modalSub');
 const reviewListEl = document.getElementById('reviewList');
 const courseSummary = document.getElementById('courseSummary');
+const teacherFilterEl = document.getElementById('teacherFilter');
+const teacherField = document.getElementById('teacherField');
+const formTeacher = document.getElementById('formTeacher');
+let currentReviews = [];     // all reviews of the open course
+let activeTeacher = '';      // '' = all teachers
 const reviewCountEl = document.getElementById('reviewCount');
 const reviewFormArea = document.getElementById('reviewFormArea');
 const loginBtn = document.getElementById('loginBtn');
@@ -300,11 +305,18 @@ function formatDate(ts) {
 // Teacher · credits · semester, shown right under the course name on the card
 // and in the course window. Credits get their own chip because they are the
 // first thing a student checks when planning a term.
+// A course's teacher options (several sections → several entries).
+function teachersOf(c) {
+  if (Array.isArray(c.teachers) && c.teachers.length) return c.teachers;
+  return c.teacher ? [c.teacher] : [];
+}
+
 function courseFacts(c, withCategory = false) {
   const hasCredits = c.credits !== null && c.credits !== undefined && c.credits !== '';
+  const teachers = teachersOf(c);
   const items = [
     `<span class="fact fact-credits">${icon('credit', 15)}${hasCredits ? escapeHtml(String(c.credits)) : '—'} кредит</span>`,
-    c.teacher ? `<span class="fact">${icon('user', 15)}${escapeHtml(c.teacher)}</span>` : '',
+    teachers.length ? `<span class="fact">${icon('user', 15)}${escapeHtml(teachers.join(' / '))}</span>` : '',
     formatSemester(c.semester) ? `<span class="fact">${icon('calendar', 15)}${escapeHtml(formatSemester(c.semester))}</span>` : '',
     withCategory && c.category ? `<span class="fact">${escapeHtml(c.category)}</span>` : '',
   ].filter(Boolean);
@@ -495,7 +507,7 @@ function applyFilters() {
     inCategory(c, activeCategory, activeSubCategory) && (!query ||
       (c.name_cn || '').toLowerCase().includes(query) ||
       (c.name_en || '').toLowerCase().includes(query) ||
-      (c.teacher || '').toLowerCase().includes(query) ||
+      teachersOf(c).join(' ').toLowerCase().includes(query) ||
       (c.category || '').toLowerCase().includes(query) ||
       (c.semester || '').toLowerCase().includes(query))
   );
@@ -514,6 +526,9 @@ async function openCourseDetail(course) {
   modalSub.innerHTML = courseFacts(course, true);
   courseSummary.hidden = true;
   reviewCountEl.textContent = '';
+  activeTeacher = '';
+  currentReviews = [];
+  setupTeacherField(course);
   // Give the open course its own address (#course-12) so the phone's Back
   // button closes it and the link can be shared.
   const hash = `#course-${course.id}`;
@@ -528,6 +543,7 @@ async function openCourseDetail(course) {
   formComment.value = '';
   formAnonymous.checked = false;
   formTakenSemester.value = '';
+  resetFormTeacher();
   setDetailsOpen(false);
 
   // Already reviewed this course? Open straight into editing it, so nobody
@@ -607,7 +623,9 @@ async function loadReviews(courseId) {
   reviewListEl.innerHTML = '<div class="loading"><span class="spinner"></span>Уншиж байна...</div>';
   const res = await apiFetch(`/api/reviews?course_id=${courseId}`);
   if (res.success) {
-    renderReviews(res.data);
+    currentReviews = res.data;
+    renderTeacherFilter();
+    renderReviews(reviewsForActiveTeacher());
   } else {
     reviewListEl.innerHTML = `<div class="empty-state">${icon('info', 32)}<p>Ачаалахад алдаа гарлаа: ${escapeHtml(res.error)}</p></div>`;
   }
@@ -717,11 +735,60 @@ function renderSummary(reviews) {
   courseSummary.hidden = false;
 }
 
+// ===== Several teachers per course =====
+// The review form asks for the teacher only when there is a real choice.
+function setupTeacherField(course) {
+  const teachers = teachersOf(course);
+  const multi = teachers.length > 1;
+  teacherField.hidden = !multi;
+  formTeacher.innerHTML = multi
+    ? `<option value="">— Багшаа сонгоно уу —</option>` +
+      teachers.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')
+    : '';
+}
+
+// Start on the teacher whose reviews are being looked at, if any.
+function resetFormTeacher() {
+  if (!teacherField.hidden) formTeacher.value = activeTeacher || '';
+}
+
+function reviewsForActiveTeacher() {
+  return activeTeacher ? currentReviews.filter(r => r.teacher === activeTeacher) : currentReviews;
+}
+
+// "Бүх багш / 张学谦 / 李成晴 …" above the scores; picks whose averages and
+// reviews are shown.
+function renderTeacherFilter() {
+  const teachers = currentCourse ? teachersOf(currentCourse) : [];
+  if (teachers.length < 2) {
+    teacherFilterEl.hidden = true;
+    teacherFilterEl.innerHTML = '';
+    return;
+  }
+  const n = (t) => currentReviews.filter(r => r.teacher === t).length;
+  teacherFilterEl.innerHTML = [
+    `<button type="button" class="cat-btn" data-teacher="" aria-pressed="${activeTeacher === ''}">Бүх багш<span class="cat-count">${currentReviews.length}</span></button>`,
+    ...teachers.map(t => `<button type="button" class="cat-btn" data-teacher="${escapeHtml(t)}" aria-pressed="${activeTeacher === t}">${icon('user', 14)}${escapeHtml(t)}<span class="cat-count">${n(t)}</span></button>`),
+  ].join('');
+  teacherFilterEl.hidden = false;
+}
+
+teacherFilterEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.cat-btn');
+  if (!btn) return;
+  activeTeacher = btn.dataset.teacher;
+  renderTeacherFilter();
+  renderReviews(reviewsForActiveTeacher());
+  // Writing a new review? Pre-select the teacher being looked at.
+  if (!editingReviewId && activeTeacher) formTeacher.value = activeTeacher;
+});
+
 function renderReviews(reviews) {
   reviewCountEl.textContent = reviews && reviews.length ? `(${reviews.length})` : '';
   if (!reviews || reviews.length === 0) {
     courseSummary.hidden = true;
-    reviewListEl.innerHTML = `<div class="empty-state">${icon('inbox', 36)}<p>Одоохондоо үнэлгээ байхгүй байна.</p></div>`;
+    const none = activeTeacher ? 'Энэ багшийн үнэлгээ одоохондоо байхгүй байна.' : 'Одоохондоо үнэлгээ байхгүй байна.';
+    reviewListEl.innerHTML = `<div class="empty-state">${icon('inbox', 36)}<p>${none}</p></div>`;
     return;
   }
   renderSummary(reviews);
@@ -750,6 +817,8 @@ function renderReviews(reviews) {
             ${r.taken_semester ? `<span class="taken-term">${escapeHtml(r.taken_semester)} 上的</span>` : ''}
             <span>${formatDate(r.created_at)}</span>
           </div>
+          ${r.teacher && currentCourse && teachersOf(currentCourse).length > 1
+            ? `<div class="review-teacher">${icon('user', 14)}${escapeHtml(r.teacher)}</div>` : ''}
         </div>
       </div>
     </div>
@@ -811,6 +880,7 @@ function renderReviews(reviews) {
         formComment.value = '';
         formAnonymous.checked = false;
         formTakenSemester.value = '';
+  resetFormTeacher();
         setDetailsOpen(false);
       }
     });
@@ -834,6 +904,9 @@ function fillEditForm(review) {
   // Only select a stored term if it's still one of the offered options.
   const term = review.taken_semester || '';
   formTakenSemester.value = [...formTakenSemester.options].some(o => o.value === term) ? term : '';
+  if (!teacherField.hidden) {
+    formTeacher.value = [...formTeacher.options].some(o => o.value === review.teacher) ? review.teacher : '';
+  }
   const hasDetails = ['midterm', 'final', 'homework', 'attendance', 'groupwork', 'bigassignment', 'grading_ratio']
     .some(k => review[k] !== null && review[k] !== undefined && String(review[k]).trim() !== '');
   setDetailsOpen(hasDetails);
@@ -847,6 +920,11 @@ async function submitReview() {
     return;
   }
   if (!currentCourse) return;
+  if (!teacherField.hidden && !formTeacher.value) {
+    showToast('Багшаа сонгоно уу', 'error');
+    formTeacher.focus();
+    return;
+  }
 
   const data = {
     course_id: currentCourse.id,
@@ -863,6 +941,7 @@ async function submitReview() {
     comment: formComment.value.trim() || null,
     is_anonymous: formAnonymous.checked,
     taken_semester: formTakenSemester.value || null,
+    teacher: teacherField.hidden ? null : formTeacher.value,
   };
 
   const wasEditing = !!editingReviewId;
@@ -915,6 +994,7 @@ async function submitReview() {
         formComment.value = '';
         formAnonymous.checked = false;
         formTakenSemester.value = '';
+  resetFormTeacher();
         setDetailsOpen(false);
       }
     } else {
@@ -1137,7 +1217,7 @@ async function submitNewCourse() {
   // Catch the obvious duplicate before a round trip; the API checks too.
   const existing = allCourses.find(c =>
     (c.name_cn || '').trim().toLowerCase() === name_cn.toLowerCase() &&
-    (c.teacher || '').trim().toLowerCase() === teacher.toLowerCase()
+    teachersOf(c).some(t => t.trim().toLowerCase() === teacher.toLowerCase())
   );
   if (existing) {
     showToast('Энэ хичээл жагсаалтад аль хэдийн байна', 'error');
@@ -1159,7 +1239,8 @@ async function submitNewCourse() {
       }),
     });
     if (res.success) {
-      showToast('Хичээл нэмэгдлээ!', 'success');
+      // Same course name, new teacher: the teacher was added to that course.
+      showToast(res.data.added_teacher ? 'Энэ хичээлд багш нэмэгдлээ!' : 'Хичээл нэмэгдлээ!', 'success');
       addCourseOverlay.classList.remove('active');
       await loadCourses();
       const added = allCourses.find(c => c.id === res.data.id);
@@ -1225,6 +1306,7 @@ cancelEditBtn.addEventListener('click', () => {
   formComment.value = '';
   formAnonymous.checked = false;
   formTakenSemester.value = '';
+  resetFormTeacher();
   setDetailsOpen(false);
 });
 
