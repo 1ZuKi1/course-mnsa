@@ -414,9 +414,12 @@ export async function handleApi(request, env) {
           await db.prepare('INSERT OR IGNORE INTO course_teachers (course_id, teacher) VALUES (?, ?)').bind(same.id, teacher).run();
           return Response.json({ success: true, data: { id: same.id, added_teacher: true } }, { headers: corsHeaders });
         }
+        // 通识课 courses also record their type and whether they are 核心课.
+        const tongshi = category.startsWith('通识课') ? category : null;
+        const isCore = tongshi && (body.is_core === true || body.is_core === 1) ? 1 : 0;
         const result = await db.prepare(
-          'INSERT INTO courses (name_cn, name_en, teacher, credits, semester, category) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(name_cn, name_en || null, teacher, credits, semester || null, category).run();
+          'INSERT INTO courses (name_cn, name_en, teacher, credits, semester, category, tongshi, is_core) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(name_cn, name_en || null, teacher, credits, semester || null, category, tongshi, isCore).run();
         const newId = result.meta.last_row_id;
         await db.prepare('INSERT OR IGNORE INTO course_teachers (course_id, teacher) VALUES (?, ?)').bind(newId, teacher).run();
         return Response.json({ success: true, data: { id: newId } }, { headers: corsHeaders });

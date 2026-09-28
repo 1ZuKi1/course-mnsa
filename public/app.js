@@ -319,6 +319,8 @@ function courseFacts(c, withCategory = false) {
     teachers.length ? `<span class="fact">${icon('user', 15)}${escapeHtml(teachers.join(' / '))}</span>` : '',
     formatSemester(c.semester) ? `<span class="fact">${icon('calendar', 15)}${escapeHtml(formatSemester(c.semester))}</span>` : '',
     withCategory && c.category ? `<span class="fact">${escapeHtml(c.category)}</span>` : '',
+    withCategory && tongshiOf(c) && tongshiOf(c) !== c.category ? `<span class="fact">${escapeHtml(tongshiOf(c))}</span>` : '',
+    withCategory && isCore(c) ? `<span class="fact"><span class="chip chip-core">核心课</span></span>` : '',
   ].filter(Boolean);
   return `<div class="course-facts">${items.join('')}</div>`;
 }
@@ -395,6 +397,8 @@ function renderCourses(courses) {
 <a class="course-card" href="#course-${c.id}" data-id="${c.id}">
   <div class="card-chips">
     ${c.category ? `<span class="chip">${escapeHtml(c.category)}</span>` : ''}
+    ${tongshiOf(c) && tongshiOf(c) !== c.category ? `<span class="chip">${escapeHtml(tongshiOf(c))}</span>` : ''}
+    ${isCore(c) ? `<span class="chip chip-core">核心课</span>` : ''}
     ${reviewedChip}
   </div>
   <h3 class="course-name">${escapeHtml(c.name_cn || c.name_en || '—')}</h3>
@@ -449,11 +453,22 @@ let activeSubCategory = '';   // '' = all 通识课, or 通识课一 …
 
 const categoryFilterEl = document.getElementById('categoryFilter');
 
-function inCategory(course, top, sub) {
+// The 通识课 type of a course (通识课一 … 四), or ''. A 与中国有关课程 course
+// can also count as a 通识课 — that's stored in course.tongshi.
+function tongshiOf(course) {
+  if (course.tongshi) return course.tongshi;
   const cat = course.category || '';
+  return cat.startsWith('通识课') ? cat : '';
+}
+const isCore = (course) => course.is_core === 1 || course.is_core === true;
+
+function inCategory(course, top, sub) {
   if (!top) return true;
-  if (top === '通识课') return sub ? cat === sub : cat.startsWith('通识课');
-  return cat === top;
+  if (top === '通识课') {
+    const t = tongshiOf(course);
+    return sub ? t === sub : !!t;
+  }
+  return (course.category || '') === top;
 }
 
 function catButton(value, label, pressed, count, level) {
@@ -509,6 +524,8 @@ function applyFilters() {
       (c.name_en || '').toLowerCase().includes(query) ||
       teachersOf(c).join(' ').toLowerCase().includes(query) ||
       (c.category || '').toLowerCase().includes(query) ||
+      tongshiOf(c).includes(query) ||
+      (isCore(c) && '核心课'.includes(query)) ||
       (c.semester || '').toLowerCase().includes(query))
   );
   renderCourses(filtered);
@@ -1191,6 +1208,8 @@ function openAddCourse() {
   // Start on whatever the list is filtered to, since that's usually what
   // the student is looking for.
   newCourseCategory.value = activeSubCategory || (activeCategory === '通识课' ? '通识课一' : activeCategory) || DEFAULT_CATEGORY;
+  newCourseCore.checked = false;
+  syncCoreField();
   addCourseOverlay.classList.add('active');
   newCourseName.focus();
 }
@@ -1236,6 +1255,7 @@ async function submitNewCourse() {
         credits: newCourseCredits.value,
         semester: newCourseSemester.value,
         category: newCourseCategory.value,
+        is_core: newCourseCategory.value.startsWith('通识课') && newCourseCore.checked,
       }),
     });
     if (res.success) {
@@ -1254,6 +1274,14 @@ async function submitNewCourse() {
     setBusy(submitCourseBtn, false);
   }
 }
+
+// "核心课" only applies to 通识课.
+const newCourseCore = document.getElementById('newCourseCore');
+const coreField = document.getElementById('coreField');
+function syncCoreField() {
+  coreField.hidden = !newCourseCategory.value.startsWith('通识课');
+}
+newCourseCategory.addEventListener('change', syncCoreField);
 
 addCourseBtn.addEventListener('click', openAddCourse);
 submitCourseBtn.addEventListener('click', submitNewCourse);

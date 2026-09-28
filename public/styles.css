@@ -225,6 +225,8 @@ a { color: var(--accent); }
   background: var(--surface-sunken); color: var(--text-secondary);
 }
 .chip-good { background: var(--good-soft); color: var(--good); }
+.chip-core { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+#coreField[hidden] { display: none; }
 .course-name { font-size: 18px; font-weight: 600; line-height: 1.4; color: var(--text); }
 .course-meta {
   color: var(--text-secondary); font-size: 15px;
