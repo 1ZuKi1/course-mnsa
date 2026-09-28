@@ -1,0 +1,39 @@
+﻿/* TEAM */
+
+    Developer:  Battugs Zuchi (族池)
+    Site:       course.icpsd.org
+    Where:      Peking University, Beijing
+
+
+/* THE STORY */
+
+    This site started as a questionnaire.
+
+    We used it to collect course reviews from the Mongolian students here.
+    It was fine at collecting — and that is where it stopped. Anyone who
+    wanted to know what a course was really like had to find the right
+    person, ask for the file, and read through it line by line.
+
+    In the first term of my second year it occurred to me that since I
+    study computer science, I could turn it into something people would
+    actually use. So I built this site, and the database behind it.
+
+    Writing a review no longer means filling in a form. Reading one no
+    longer means asking someone for a file. You just search for the course.
+
+    I hope it saves the students coming after us a few wrong turns.
+
+
+/* SITE */
+
+    Launched:   2026
+    Frontend:   Static HTML, vanilla JavaScript, no framework
+    Backend:    Cloudflare Workers
+    Database:   Cloudflare D1 (SQLite)
+    Email:      Resend
+    Hosting:    Cloudflare
+
+
+                        ---
+
+        Built for the Mongolian students at Peking University.

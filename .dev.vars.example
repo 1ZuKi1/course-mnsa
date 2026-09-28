@@ -1,0 +1,7 @@
+# Copy this file to .dev.vars for local development (`npm run dev`).
+# .dev.vars is git-ignored. Production secrets are set with `npx wrangler secret put`.
+JWT_SECRET=local-dev-only-change-me
+# Print login codes in the terminal instead of emailing them (local only!).
+DEV_LOG_CODES=true
+# Only needed if you want real emails locally:
+# RESEND_API_KEY=re_xxx

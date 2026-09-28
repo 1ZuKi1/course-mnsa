@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "projectId": "a17e145b-2a2b-42d5-b366-e7e364adb5b6",
+  "canvas": "https://superdesign.dev/teams/e4199552-9911-4938-811b-e0559f60eb43/projects/a17e145b-2a2b-42d5-b366-e7e364adb5b6",
+  "targets": {
+    "/": {
+      "description": "Course list + course detail (review form, reviews)",
+      "baselineDraftId": "b31bc8b0-dd63-4cb5-9739-8df75900a872",
+      "activeDraftId": "2e1095ea-9433-463f-8c23-979b906b6565",
+      "activeDirection": "Warm Paper redesign (v2: 6 cards, fixed stat tiles, full 0-10 pickers, 14px min text)",
+      "contextFiles": [".superdesign/design-system.md", ".superdesign/sample-data.md", "src/markup.html:1:262", "src/render.js"],
+      "note": "src/* are slices of index.html: styles.css = lines 25-1744, markup.html = 1747-2149, render.js = 2181-2207 + 2464-2528 + 2631-2700"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+.dev.vars
+# Database exports contain students' emails — never commit them.
+backups/
+*.sql.bak
+export*.sql

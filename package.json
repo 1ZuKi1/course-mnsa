@@ -1,0 +1,16 @@
+{
+  "name": "mnsa-course",
+  "private": true,
+  "description": "Монгол оюутнуудын хичээлийн үнэлгээ — course reviews for Mongolian students at PKU",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply mnsa-course-db --local",
+    "db:seed:local": "wrangler d1 execute mnsa-course-db --local --file=seed/dev_seed.sql",
+    "db:migrate": "wrangler d1 migrations apply mnsa-course-db --remote",
+    "db:backup": "wrangler d1 export mnsa-course-db --remote --output=backups/backup.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.42.0"
+  }
+}

@@ -1,0 +1,6 @@
+# Workers serves .txt without a charset, so browsers fall back to Latin-1 and
+# mangle every non-ASCII character. State the encoding explicitly.
+# This file is read by Wrangler at deploy time and is not published itself.
+
+/humans.txt
+  Content-Type: text/plain; charset=utf-8
