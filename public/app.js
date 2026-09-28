@@ -316,7 +316,11 @@ function courseFacts(c, withCategory = false) {
   const teachers = teachersOf(c);
   const items = [
     `<span class="fact fact-credits">${icon('credit', 15)}${hasCredits ? escapeHtml(String(c.credits)) : '—'} кредит</span>`,
-    teachers.length ? `<span class="fact">${icon('user', 15)}${escapeHtml(teachers.join(' / '))}</span>` : '',
+    // Long lists (太极拳 has 11 teachers) show the first two and a count;
+    // the full list is in the tooltip and in the course window's filter.
+    teachers.length ? `<span class="fact" title="${escapeHtml(teachers.join(' / '))}">${icon('user', 15)}${escapeHtml(
+      teachers.length > 3 ? `${teachers.slice(0, 2).join(' / ')} +${teachers.length - 2} багш` : teachers.join(' / ')
+    )}</span>` : '',
     formatSemester(c.semester) ? `<span class="fact">${icon('calendar', 15)}${escapeHtml(formatSemester(c.semester))}</span>` : '',
     withCategory && c.category ? `<span class="fact">${escapeHtml(c.category)}</span>` : '',
     withCategory && tongshiOf(c) && tongshiOf(c) !== c.category ? `<span class="fact">${escapeHtml(tongshiOf(c))}</span>` : '',
