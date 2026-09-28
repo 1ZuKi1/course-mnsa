@@ -335,7 +335,8 @@ async function loadCourses() {
   if (res.success) {
     allCourses = res.data;
     await loadMyReviews();
-    renderCourses(allCourses);
+    renderCategoryFilter();
+    applyFilters();
   } else {
     courseListEl.innerHTML = `<div class="empty-state">${icon('info', 32)}<p>Ачаалахад алдаа гарлаа: ${escapeHtml(res.error)}</p></div>`;
   }
@@ -422,19 +423,77 @@ function renderSignature() {
   `;
 }
 
-searchInput.addEventListener('input', () => {
+// ===== Categories =====
+// The only categories a course can have. 通识课 has four sub-types, stored as
+// the full name (通识课一 …) so each course keeps exactly one category.
+const COURSE_CATEGORIES = [
+  { value: '与中国有关课程', label: '与中国有关课程' },
+  { value: '通识课', label: '通识课', subs: ['通识课一', '通识课二', '通识课三', '通识课四'] },
+  { value: '体育课', label: '体育课' },
+];
+const DEFAULT_CATEGORY = '与中国有关课程';
+let activeCategory = '';      // '' = all, or a top-level value
+let activeSubCategory = '';   // '' = all 通识课, or 通识课一 …
+
+const categoryFilterEl = document.getElementById('categoryFilter');
+const categorySubEl = document.getElementById('categorySub');
+
+function inCategory(course, top, sub) {
+  const cat = course.category || '';
+  if (!top) return true;
+  if (top === '通识课') return sub ? cat === sub : cat.startsWith('通识课');
+  return cat === top;
+}
+
+function catButton(value, label, pressed, count, level) {
+  return `<button type="button" class="cat-btn" data-level="${level}" data-value="${escapeHtml(value)}" aria-pressed="${pressed}">${escapeHtml(label)}<span class="cat-count">${count}</span></button>`;
+}
+
+function renderCategoryFilter() {
+  const count = (top, sub = '') => allCourses.filter(c => inCategory(c, top, sub)).length;
+  categoryFilterEl.innerHTML = [
+    catButton('', 'Бүгд', activeCategory === '', allCourses.length, 'top'),
+    ...COURSE_CATEGORIES.map(c => catButton(c.value, c.label, activeCategory === c.value, count(c.value), 'top')),
+  ].join('');
+  const tongshi = COURSE_CATEGORIES.find(c => c.subs);
+  categorySubEl.hidden = activeCategory !== tongshi.value;
+  categorySubEl.innerHTML = [
+    catButton('', 'Бүх 通识课', activeSubCategory === '', count(tongshi.value), 'sub'),
+    ...tongshi.subs.map(s => catButton(s, s, activeSubCategory === s, count(tongshi.value, s), 'sub')),
+  ].join('');
+}
+
+function onCategoryClick(e) {
+  const btn = e.target.closest('.cat-btn');
+  if (!btn) return;
+  if (btn.dataset.level === 'top') {
+    activeCategory = btn.dataset.value;
+    activeSubCategory = '';
+  } else {
+    activeSubCategory = btn.dataset.value;
+  }
+  renderCategoryFilter();
+  applyFilters();
+}
+categoryFilterEl.addEventListener('click', onCategoryClick);
+categorySubEl.addEventListener('click', onCategoryClick);
+
+// Search text and category filter work together.
+function applyFilters() {
   const query = searchInput.value.toLowerCase().trim();
-  if (!query) { renderCourses(allCourses); return; }
-  if (AUTHOR_KEYWORDS.includes(query)) { renderSignature(); return; }
+  if (query && AUTHOR_KEYWORDS.includes(query)) { renderSignature(); return; }
   const filtered = allCourses.filter(c =>
-    (c.name_cn || '').toLowerCase().includes(query) ||
-    (c.name_en || '').toLowerCase().includes(query) ||
-    (c.teacher || '').toLowerCase().includes(query) ||
-    (c.category || '').toLowerCase().includes(query) ||
-    (c.semester || '').toLowerCase().includes(query)
+    inCategory(c, activeCategory, activeSubCategory) && (!query ||
+      (c.name_cn || '').toLowerCase().includes(query) ||
+      (c.name_en || '').toLowerCase().includes(query) ||
+      (c.teacher || '').toLowerCase().includes(query) ||
+      (c.category || '').toLowerCase().includes(query) ||
+      (c.semester || '').toLowerCase().includes(query))
   );
   renderCourses(filtered);
-});
+}
+
+searchInput.addEventListener('input', applyFilters);
 
 // ===== Course Detail & Reviews =====
 async function openCourseDetail(course) {
@@ -1035,13 +1094,14 @@ function openAddCourse() {
   newCourseTeacher.value = '';
   newCourseCredits.value = '';
   newCourseSemester.value = '秋季';
-  // Build the category list from what already exists so students can't
-  // invent near-duplicate categories by typing.
-  const categories = [...new Set(allCourses.map(c => c.category).filter(Boolean))].sort();
-  if (categories.length === 0) categories.push('本科');
-  newCourseCategory.innerHTML = categories
-    .map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`)
-    .join('');
+  // Fixed list — the same one the API accepts.
+  newCourseCategory.innerHTML = COURSE_CATEGORIES.map(c => c.subs
+    ? `<optgroup label="${escapeHtml(c.label)}">${c.subs.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('')}</optgroup>`
+    : `<option value="${escapeHtml(c.value)}">${escapeHtml(c.label)}</option>`
+  ).join('');
+  // Start on whatever the list is filtered to, since that's usually what
+  // the student is looking for.
+  newCourseCategory.value = activeSubCategory || (activeCategory === '通识课' ? '通识课一' : activeCategory) || DEFAULT_CATEGORY;
   addCourseOverlay.classList.add('active');
   newCourseName.focus();
 }

@@ -36,7 +36,7 @@ SITE_URL = "https://course.icpsd.org"
 binding = "DB"
 database_name = "mnsa-course-db"
 # Paste the id printed by `npx wrangler d1 create mnsa-course-db` (README step 2).
-database_id = "REPLACE_WITH_DATABASE_ID"
+database_id = "a869fccf-ac04-4268-aef8-75005ac60d91"
 migrations_dir = "migrations"
 
 # Custom domain — add only at cutover (README step 6), after the old Workers

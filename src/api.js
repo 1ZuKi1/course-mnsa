@@ -339,7 +339,12 @@ export async function handleApi(request, env) {
         const name_en = (body.name_en || '').trim();
         const teacher = (body.teacher || '').trim();
         const semester = (body.semester || '').trim();
-        const category = (body.category || '').trim() || '本科';
+        // Must match COURSE_CATEGORIES in public/app.js.
+        const CATEGORIES = ['与中国有关课程', '通识课一', '通识课二', '通识课三', '通识课四', '体育课'];
+        const category = (body.category || '').trim() || '与中国有关课程';
+        if (!CATEGORIES.includes(category)) {
+          return Response.json({ success: false, error: 'Ангилал буруу байна' }, { status: 400, headers: corsHeaders });
+        }
         const credits = (body.credits === '' || body.credits === null || body.credits === undefined)
           ? null
           : Number(body.credits);
