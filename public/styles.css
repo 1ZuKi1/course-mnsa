@@ -163,9 +163,7 @@ a { color: var(--accent); }
 .search-box input::placeholder { color: var(--text-muted); }
 .search-box input:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
-.category-filter, .category-sub { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-.category-sub[hidden] { display: none; }
-.category-sub { padding-left: 12px; border-left: 2px solid var(--border); margin-left: 4px; }
+.category-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .cat-btn {
   display: inline-flex; align-items: center; gap: 6px;
   min-height: 40px; padding: 8px 14px; border-radius: var(--radius-control);
@@ -177,7 +175,15 @@ a { color: var(--accent); }
 .cat-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .cat-count { font-size: 14px; color: var(--text-muted); font-weight: 500; }
 .cat-btn[aria-pressed="true"] .cat-count { color: #d7ebe7; }
-.category-sub .cat-btn { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+/* 通识课 + 1 2 3 4 as one joined control */
+.cat-group { display: inline-flex; flex-shrink: 0; }
+.cat-group .cat-btn { border-radius: 0; margin-left: -1px; }
+.cat-group .cat-btn:first-child { border-radius: var(--radius-control) 0 0 var(--radius-control); margin-left: 0; }
+.cat-group .cat-btn:last-child { border-radius: 0 var(--radius-control) var(--radius-control) 0; }
+.cat-num { min-width: 40px; justify-content: center; padding: 8px 0; font-weight: 600; color: var(--text-secondary); }
+.cat-btn[aria-pressed="true"] { position: relative; z-index: 1; }
+.cat-main.cat-parent { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); position: relative; z-index: 1; }
+.cat-main.cat-parent .cat-count { color: var(--accent-ink); }
 @media (max-width: 640px) {
   .category-filter { flex-wrap: nowrap; overflow-x: auto; margin-right: -16px; padding-right: 16px; scrollbar-width: none; }
   .category-filter::-webkit-scrollbar { display: none; }

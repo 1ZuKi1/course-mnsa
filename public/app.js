@@ -436,7 +436,6 @@ let activeCategory = '';      // '' = all, or a top-level value
 let activeSubCategory = '';   // '' = all 通识课, or 通识课一 …
 
 const categoryFilterEl = document.getElementById('categoryFilter');
-const categorySubEl = document.getElementById('categorySub');
 
 function inCategory(course, top, sub) {
   const cat = course.category || '';
@@ -449,17 +448,25 @@ function catButton(value, label, pressed, count, level) {
   return `<button type="button" class="cat-btn" data-level="${level}" data-value="${escapeHtml(value)}" aria-pressed="${pressed}">${escapeHtml(label)}<span class="cat-count">${count}</span></button>`;
 }
 
+// 通识课 is one joined control: the name (= all four types) followed by small
+// 1 2 3 4 buttons for 通识课一 … 通识课四.
+function catGroup(c, count) {
+  const onGroup = activeCategory === c.value;
+  const main = `<button type="button" class="cat-btn cat-main${onGroup && activeSubCategory ? ' cat-parent' : ''}" data-level="top" data-value="${escapeHtml(c.value)}" aria-pressed="${onGroup && !activeSubCategory}">${escapeHtml(c.label)}<span class="cat-count">${count(c.value)}</span></button>`;
+  const subs = c.subs.map((s, i) => {
+    const n = count(c.value, s);
+    return `<button type="button" class="cat-btn cat-num" data-level="sub" data-value="${escapeHtml(s)}" aria-pressed="${activeSubCategory === s}" aria-label="${escapeHtml(s)} (${n})" title="${escapeHtml(s)} · ${n}">${i + 1}</button>`;
+  }).join('');
+  return `<span class="cat-group" role="group" aria-label="${escapeHtml(c.label)}">${main}${subs}</span>`;
+}
+
 function renderCategoryFilter() {
   const count = (top, sub = '') => allCourses.filter(c => inCategory(c, top, sub)).length;
   categoryFilterEl.innerHTML = [
     catButton('', 'Бүгд', activeCategory === '', allCourses.length, 'top'),
-    ...COURSE_CATEGORIES.map(c => catButton(c.value, c.label, activeCategory === c.value, count(c.value), 'top')),
-  ].join('');
-  const tongshi = COURSE_CATEGORIES.find(c => c.subs);
-  categorySubEl.hidden = activeCategory !== tongshi.value;
-  categorySubEl.innerHTML = [
-    catButton('', 'Бүх 通识课', activeSubCategory === '', count(tongshi.value), 'sub'),
-    ...tongshi.subs.map(s => catButton(s, s, activeSubCategory === s, count(tongshi.value, s), 'sub')),
+    ...COURSE_CATEGORIES.map(c => c.subs
+      ? catGroup(c, count)
+      : catButton(c.value, c.label, activeCategory === c.value, count(c.value), 'top')),
   ].join('');
 }
 
@@ -470,13 +477,15 @@ function onCategoryClick(e) {
     activeCategory = btn.dataset.value;
     activeSubCategory = '';
   } else {
-    activeSubCategory = btn.dataset.value;
+    // A number button selects its 通识课 type; pressing it again goes back
+    // to all 通识课.
+    activeCategory = '通识课';
+    activeSubCategory = activeSubCategory === btn.dataset.value ? '' : btn.dataset.value;
   }
   renderCategoryFilter();
   applyFilters();
 }
 categoryFilterEl.addEventListener('click', onCategoryClick);
-categorySubEl.addEventListener('click', onCategoryClick);
 
 // Search text and category filter work together.
 function applyFilters() {
