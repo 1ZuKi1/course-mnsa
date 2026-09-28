@@ -319,8 +319,9 @@ export async function handleApi(request, env) {
         }
         const sql = `
           SELECT c.*,
-            (SELECT GROUP_CONCAT(teacher, '||') FROM
-               (SELECT teacher FROM course_teachers ct WHERE ct.course_id = c.id ORDER BY ct.id)
+            (SELECT GROUP_CONCAT(entry, '||') FROM
+               (SELECT ct.teacher || '::' || IFNULL(ct.note, '') AS entry
+                FROM course_teachers ct WHERE ct.course_id = c.id ORDER BY ct.id)
             ) AS teacher_list,
             COALESCE(rv.review_count, 0) AS review_count,
             rv.avg_score AS avg_score
@@ -351,10 +352,18 @@ export async function handleApi(request, env) {
           ORDER BY review_count DESC, c.id ASC
         `;
         const { results } = await db.prepare(sql).bind(...params).all();
-        const data = results.map(({ teacher_list, ...c }) => ({
-          ...c,
-          teachers: teacher_list ? teacher_list.split('||') : (c.teacher ? [c.teacher] : []),
-        }));
+        // teachers: names in order; teacher_notes: e.g. { 王东敏: '男生班' }
+        // for sections that are only for men or only for women.
+        const data = results.map(({ teacher_list, ...c }) => {
+          const entries = teacher_list ? teacher_list.split('||').map(e => e.split('::')) : [];
+          const teacher_notes = {};
+          entries.forEach(([t, note]) => { if (note) teacher_notes[t] = note; });
+          return {
+            ...c,
+            teachers: entries.length ? entries.map(([t]) => t) : (c.teacher ? [c.teacher] : []),
+            teacher_notes,
+          };
+        });
         return Response.json({ success: true, data }, { headers: corsHeaders });
       }
 

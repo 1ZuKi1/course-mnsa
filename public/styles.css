@@ -226,6 +226,9 @@ a { color: var(--accent); }
 }
 .chip-good { background: var(--good-soft); color: var(--good); }
 .chip-core { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.chip-gender { background: var(--mid-soft); color: var(--mid); font-weight: 600; }
+.teacher-note { font-size: 14px; font-weight: 600; color: var(--mid); background: var(--mid-soft); padding: 1px 6px; border-radius: 6px; }
+.cat-btn[aria-pressed="true"] .teacher-note { background: rgba(255,255,255,0.2); color: #fff; }
 #coreField[hidden] { display: none; }
 .course-name { font-size: 18px; font-weight: 600; line-height: 1.4; color: var(--text); }
 .course-meta {

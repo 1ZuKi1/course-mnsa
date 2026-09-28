@@ -311,6 +311,20 @@ function teachersOf(c) {
   return c.teacher ? [c.teacher] : [];
 }
 
+// 男生班 / 女生班 of one teacher's sections ('' if open to everyone).
+function teacherNote(c, t) {
+  return (c && c.teacher_notes && c.teacher_notes[t]) || '';
+}
+// For the whole course: which of 男生班 / 女生班 appear in any section.
+function courseGender(c) {
+  const notes = Object.values((c && c.teacher_notes) || {}).join(' ');
+  return ['男生班', '女生班'].filter(g => notes.includes(g)).join(' / ');
+}
+function teacherLabel(c, t, sep = ' · ') {
+  const note = teacherNote(c, t);
+  return note ? `${t}${sep}${note}` : t;
+}
+
 function courseFacts(c, withCategory = false) {
   const hasCredits = c.credits !== null && c.credits !== undefined && c.credits !== '';
   const teachers = teachersOf(c);
@@ -325,6 +339,7 @@ function courseFacts(c, withCategory = false) {
     withCategory && c.category ? `<span class="fact">${escapeHtml(c.category)}</span>` : '',
     withCategory && tongshiOf(c) && tongshiOf(c) !== c.category ? `<span class="fact">${escapeHtml(tongshiOf(c))}</span>` : '',
     withCategory && isCore(c) ? `<span class="fact"><span class="chip chip-core">核心课</span></span>` : '',
+    withCategory && courseGender(c) ? `<span class="fact"><span class="chip chip-gender">${escapeHtml(courseGender(c))}</span></span>` : '',
   ].filter(Boolean);
   return `<div class="course-facts">${items.join('')}</div>`;
 }
@@ -403,6 +418,7 @@ function renderCourses(courses) {
     ${c.category ? `<span class="chip">${escapeHtml(c.category)}</span>` : ''}
     ${tongshiOf(c) && tongshiOf(c) !== c.category ? `<span class="chip">${escapeHtml(tongshiOf(c))}</span>` : ''}
     ${isCore(c) ? `<span class="chip chip-core">核心课</span>` : ''}
+    ${courseGender(c) ? `<span class="chip chip-gender">${escapeHtml(courseGender(c))}</span>` : ''}
     ${reviewedChip}
   </div>
   <h3 class="course-name">${escapeHtml(c.name_cn || c.name_en || '—')}</h3>
@@ -764,7 +780,7 @@ function setupTeacherField(course) {
   teacherField.hidden = !multi;
   formTeacher.innerHTML = multi
     ? `<option value="">— Багшаа сонгоно уу —</option>` +
-      teachers.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')
+      teachers.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(teacherLabel(course, t, '（') + (teacherNote(course, t) ? '）' : ''))}</option>`).join('')
     : '';
 }
 
@@ -789,7 +805,7 @@ function renderTeacherFilter() {
   const n = (t) => currentReviews.filter(r => r.teacher === t).length;
   teacherFilterEl.innerHTML = [
     `<button type="button" class="cat-btn" data-teacher="" aria-pressed="${activeTeacher === ''}">Бүх багш<span class="cat-count">${currentReviews.length}</span></button>`,
-    ...teachers.map(t => `<button type="button" class="cat-btn" data-teacher="${escapeHtml(t)}" aria-pressed="${activeTeacher === t}">${icon('user', 14)}${escapeHtml(t)}<span class="cat-count">${n(t)}</span></button>`),
+    ...teachers.map(t => `<button type="button" class="cat-btn" data-teacher="${escapeHtml(t)}" aria-pressed="${activeTeacher === t}">${icon('user', 14)}${escapeHtml(t)}${teacherNote(currentCourse, t) ? `<span class="teacher-note">${escapeHtml(teacherNote(currentCourse, t))}</span>` : ''}<span class="cat-count">${n(t)}</span></button>`),
   ].join('');
   teacherFilterEl.hidden = false;
 }
@@ -839,7 +855,7 @@ function renderReviews(reviews) {
             <span>${formatDate(r.created_at)}</span>
           </div>
           ${r.teacher && currentCourse && teachersOf(currentCourse).length > 1
-            ? `<div class="review-teacher">${icon('user', 14)}${escapeHtml(r.teacher)}</div>` : ''}
+            ? `<div class="review-teacher">${icon('user', 14)}${escapeHtml(teacherLabel(currentCourse, r.teacher))}</div>` : ''}
         </div>
       </div>
     </div>
