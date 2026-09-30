@@ -41,5 +41,5 @@ binding = "DB"
 database_name = "mnsa-course-db"
 # The association account's database: paste the id printed by
 # `npx wrangler d1 create mnsa-course-db` (README Phase 2, step 3).
-database_id = "a869fccf-ac04-4268-aef8-75005ac60d91"
+database_id = "1ae3b0a1-9986-49cf-ba1f-063ad4267baf"
 migrations_dir = "migrations"
