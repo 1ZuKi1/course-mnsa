@@ -131,7 +131,7 @@ export async function handleApi(request, env) {
       async function sendVerificationEmail(email, code, apiKey) {
         // MAIL_FROM lets the sender follow whichever domain is verified in
         // Resend without another code change.
-        const from = env.MAIL_FROM || 'Хичээлийн үнэлгээ <noreply@pkumongolia.com>';
+        const from = env.MAIL_FROM || 'Хичээлийн үнэлгээ <noreply@course.pkumongolia.com>';
         const siteUrl = env.SITE_URL || 'https://course.pkumongolia.com';
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',

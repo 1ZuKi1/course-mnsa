@@ -28,7 +28,7 @@ run_worker_first = ["/api/*"]
 # Only these email domains may request a login code (comma-separated).
 ALLOWED_EMAIL_DOMAINS = "stu.pku.edu.cn"
 # Must be an address on a domain verified in Resend.
-MAIL_FROM = "Хичээлийн үнэлгээ <noreply@pkumongolia.com>"
+MAIL_FROM = "Хичээлийн үнэлгээ <noreply@course.pkumongolia.com>"
 # Link printed at the bottom of the login email.
 SITE_URL = "https://course.pkumongolia.com"
 
