@@ -1,7 +1,7 @@
 ﻿/* TEAM */
 
     Developer:  Battugs Zuchi (族池)
-    Site:       course.icpsd.org
+    Site:       course.pkumongolia.com
     Where:      Peking University, Beijing
 
 

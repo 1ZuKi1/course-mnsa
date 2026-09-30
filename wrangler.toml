@@ -1,8 +1,7 @@
 # Хичээлийн үнэлгээ — one Worker serves the website (public/) and the API (/api/*).
 #
-# This is the LIVE site (course.icpsd.org) on the personal Cloudflare account.
-# The old Workers (mongol-course-frontend + mongol-course-api) are retired.
-# See README.md for moving it to the student association's account.
+# Live site: https://course.pkumongolia.com on the student association's
+# Cloudflare account (moved from the personal account / course.icpsd.org).
 
 name = "mnsa-course"
 main = "src/index.js"
@@ -11,11 +10,10 @@ compatibility_date = "2025-09-01"
 # Gives the test site a free address: https://mnsa-course.<your-subdomain>.workers.dev
 workers_dev = true
 
-# Live address. (Attached in the dashboard at cutover; listed here so every
-# `npm run deploy` keeps the domain on this Worker.) Must stay above the
-# first [section] below, or TOML would read it as part of that section.
+# Live address — `npm run deploy` attaches it to this Worker. Must stay above
+# the first [section] below, or TOML would read it as part of that section.
 routes = [
-  { pattern = "course.icpsd.org", custom_domain = true }
+  { pattern = "course.pkumongolia.com", custom_domain = true }
 ]
 
 # Static files. Only what is inside public/ is published — nothing else in the
@@ -30,9 +28,9 @@ run_worker_first = ["/api/*"]
 # Only these email domains may request a login code (comma-separated).
 ALLOWED_EMAIL_DOMAINS = "stu.pku.edu.cn"
 # Must be an address on a domain verified in Resend.
-MAIL_FROM = "Хичээлийн үнэлгээ <noreply@course.icpsd.org>"
+MAIL_FROM = "Хичээлийн үнэлгээ <noreply@pkumongolia.com>"
 # Link printed at the bottom of the login email.
-SITE_URL = "https://course.icpsd.org"
+SITE_URL = "https://course.pkumongolia.com"
 
 # Secrets — set with `npx wrangler secret put <NAME>`, never written in this file:
 #   JWT_SECRET      signs login tokens and hashes login codes
@@ -41,6 +39,7 @@ SITE_URL = "https://course.icpsd.org"
 [[d1_databases]]
 binding = "DB"
 database_name = "mnsa-course-db"
-# Paste the id printed by `npx wrangler d1 create mnsa-course-db` (README step 2).
+# The association account's database: paste the id printed by
+# `npx wrangler d1 create mnsa-course-db` (README Phase 2, step 3).
 database_id = "a869fccf-ac04-4268-aef8-75005ac60d91"
 migrations_dir = "migrations"
