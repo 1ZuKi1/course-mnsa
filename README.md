@@ -91,17 +91,44 @@ When the test version is good:
 
 ## Phase 2 — move to the student association's Cloudflare
 
-After the association has its own account and domain:
+The live site now runs as Worker `mnsa-course` + database `mnsa-course-db` on the
+personal account, at course.icpsd.org. Moving it = copying that database to the
+association's account and deploying the same code there.
 
-1. Add at least two admins to the association account.
-2. Pause writes briefly (e.g. announce a 10-minute window), then back up:
-   `npx wrangler d1 export mongol-course-db --remote --output=backups/final.sql`
-3. `npx wrangler logout && npx wrangler login` as the association account.
-4. Repeat Phase 1 steps 2–5 in the new account (new database id, same secrets or new ones).
-5. Update `MAIL_FROM` and `SITE_URL` in `wrangler.toml` for the new domain, verify that
-   domain in Resend (ideally a Resend account owned by the association), and add the
-   new domain in the `routes` block.
-6. Once the new site works, delete the Worker and database from the personal account.
+**Before you start (decisions + accounts)**
+
+- Association Cloudflare account with at least two admins.
+- The association's domain added to that account (its name servers pointed at Cloudflare).
+- A Resend account owned by the association, with the new domain verified, and an API key.
+- The `JWT_SECRET` value from the password manager (same value = nobody has to log in again).
+
+**Steps**
+
+1. Announce a short pause (≈15 min, no new reviews), then — still logged in to the
+   **personal** account — back up the live data:
+   `npx wrangler d1 export mnsa-course-db --remote --output=backups/final.sql`
+2. Switch Wrangler to the association account:
+   `npx wrangler logout` then `npx wrangler login` (sign in as the association).
+3. Create the database there and paste its id into `wrangler.toml` → `database_id`:
+   `npx wrangler d1 create mnsa-course-db`
+4. Load the backup:
+   `npx wrangler d1 execute mnsa-course-db --remote --file=backups/final.sql`
+5. Check the migration history came along:
+   `npx wrangler d1 migrations list mnsa-course-db --remote`
+   It must say **no migrations to apply**. If it lists 0002–0007 instead, stop — do not
+   run `db:migrate` (0004/0005/0007 would fail on columns that already exist); the
+   d1_migrations table needs to be copied first.
+6. Secrets: `npx wrangler secret put JWT_SECRET` (old value) and
+   `npx wrangler secret put RESEND_API_KEY` (the association's key).
+7. In `wrangler.toml` change `routes`, `MAIL_FROM` and `SITE_URL` to the new domain,
+   then `npm run deploy`. Test on the workers.dev address and the new domain:
+   course list, login email, writing a review.
+8. Old address: on the personal account, remove `course.icpsd.org` from the Worker and
+   add a Redirect Rule `course.icpsd.org/*` → the new address, so old links keep working.
+9. After a week or two without problems, delete the personal `mnsa-course` Worker and
+   `mnsa-course-db` (keep `backups/final.sql` somewhere safe and private).
+10. GitHub: repository **Settings → Transfer ownership** to the association's organization.
+    Optionally connect it in Cloudflare (Worker → Settings → Builds) for automatic deploys.
 
 ---
 
