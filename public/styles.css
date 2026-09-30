@@ -163,6 +163,9 @@ a { color: var(--accent); }
 .search-box input::placeholder { color: var(--text-muted); }
 .search-box input:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
+.filter-bar { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.filter-bar .category-filter { flex: 1; min-width: 0; margin-bottom: 0; }
+.filter-bar #addCourseBtn { flex-shrink: 0; min-height: 40px; }
 .category-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .cat-btn {
   display: inline-flex; align-items: center; gap: 6px;
@@ -185,7 +188,10 @@ a { color: var(--accent); }
 .cat-main.cat-parent { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); position: relative; z-index: 1; }
 .cat-main.cat-parent .cat-count { color: var(--accent-ink); }
 @media (max-width: 640px) {
-  .category-filter { flex-wrap: nowrap; overflow-x: auto; margin-right: -16px; padding-right: 16px; scrollbar-width: none; }
+  .category-filter { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  /* Phones: the add button becomes a square "+" so the filters keep their room */
+  .filter-bar #addCourseBtn { width: 40px; padding: 0; }
+  .filter-bar .add-label { display: none; }
   .category-filter::-webkit-scrollbar { display: none; }
   .cat-btn { flex-shrink: 0; }
 }
