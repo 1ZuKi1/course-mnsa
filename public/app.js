@@ -851,7 +851,7 @@ function renderReviews(reviews) {
         <div>
           <div class="name">${escapeHtml(authorName)}</div>
           <div class="date">
-            ${r.taken_semester ? `<span class="taken-term">${escapeHtml(r.taken_semester)} 上的</span>` : ''}
+            ${r.taken_semester ? `<span class="taken-term">${escapeHtml(r.taken_semester)}</span>` : ''}
             <span>${formatDate(r.created_at)}</span>
           </div>
           ${r.teacher && currentCourse && teachersOf(currentCourse).length > 1
