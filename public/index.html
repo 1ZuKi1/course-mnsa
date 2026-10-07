@@ -13,7 +13,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#f5f1ea" />
+  <meta name="theme-color" content="#f5f1ea" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1b1916" media="(prefers-color-scheme: dark)" />
+  <script>
+    // Apply a theme the student picked before the page paints (no flash).
+    try { var t = localStorage.getItem('mnsa_theme'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
   <meta name="author" content="Battugs Zuchi (族池)" />
   <link rel="author" href="/humans.txt" />
   <title>Монгол оюутнуудын хичээлийн үнэлгээ</title>
@@ -37,9 +42,12 @@
           <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
         </span>
         <span class="brand-text">Хичээлийн үнэлгээ</span>
-        <span class="badge">Beta</span>
       </div>
       <div class="user-area">
+        <button class="close-btn theme-btn" id="themeBtn" type="button" aria-label="Харанхуй / гэгээлэг горим" title="Харанхуй / гэгээлэг горим">
+          <svg class="icon theme-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg class="icon theme-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        </button>
         <div id="userInfo" class="user-info">
           <span id="userName" class="user-name"></span>
           <span id="userRole" class="user-role"></span>
@@ -60,9 +68,10 @@
   <!-- Main content -->
   <main class="container">
     <div class="page-head">
-      <p class="eyebrow">Монгол оюутнуудад зориулсан</p>
-      <h1>Бүх хичээлүүд</h1>
-      <p class="page-sub">Хичээл дээр дарж үнэлгээг харна уу</p>
+      <p class="eyebrow">Монгол оюутны холбоо</p>
+      <h1>Хичээлээ зөв сонгоё</h1>
+      <p class="page-sub">Ах эгч, найз нөхдийнхөө туршлагаас суралцаарай. Өөрийн үзсэн хичээлдээ сэтгэгдэл үлдээхээ мартуузай.</p>
+      <p class="page-stats" id="pageStats" hidden></p>
     </div>
 
     <div class="search-box">
@@ -84,6 +93,14 @@
 
     <div class="list-toolbar">
       <span class="list-count" id="courseCount" aria-live="polite"></span>
+      <label class="sort-control">
+        <span class="sr-only">Эрэмбэлэх</span>
+        <select id="sortSelect">
+          <option value="reviews">Үнэлгээ олонтой нь эхэнд</option>
+          <option value="score">Оноо өндөртэй нь эхэнд</option>
+          <option value="name">Нэрээр</option>
+        </select>
+      </label>
     </div>
 
     <div id="courseList" class="course-grid" tabindex="-1">
@@ -103,6 +120,9 @@
           <button class="btn btn-primary btn-sm write-jump" id="jumpToFormBtn" type="button" aria-label="Үнэлгээ бичих">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
             <span>Үнэлгээ бичих</span>
+          </button>
+          <button class="close-btn share-btn" id="shareCourseBtn" type="button" aria-label="Холбоос хуваалцах" title="Холбоос хуваалцах">
+            <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           </button>
           <button class="close-btn" id="modalCloseBtn" type="button" aria-label="Хаах">
             <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -148,9 +168,9 @@
           <div class="review-form" id="reviewFormArea">
             <h3 class="form-title" id="writeHeading">
               <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-              添加评价
+              Үнэлгээ бичих
             </h3>
-            <p class="form-hint">打 3 个分数就能提交，其余都是选填</p>
+            <p class="form-hint">Гурван оноогоо өгөхөд л илгээж болно. Бусад нь заавал биш.</p>
 
             <!-- Shown only when the course has several teachers; then required -->
             <div class="form-group" id="teacherField" hidden>
@@ -161,154 +181,154 @@
 
             <!-- 三个评分：电脑上是 0–10 按钮，手机上是滑块。滑块 input 是唯一的数据来源 -->
             <fieldset class="score-field">
-              <legend>内容</legend>
-              <div class="score-seg" data-for="formContentScore" role="radiogroup" aria-label="内容 0–10"></div>
+              <legend>Агуулга<span class="cn">内容</span></legend>
+              <div class="score-seg" data-for="formContentScore" role="radiogroup" aria-label="Агуулга 0–10"></div>
               <div class="slider-row">
-                <input type="range" id="formContentScore" class="score-slider" min="0" max="10" step="1" value="5" aria-label="内容" />
+                <input type="range" id="formContentScore" class="score-slider" min="0" max="10" step="1" value="5" aria-label="Агуулга" />
                 <output class="slider-value" id="formContentScoreValue">5</output>
               </div>
-              <div class="score-ends"><span>0 = 很差</span><span>10 = 很好</span></div>
+              <div class="score-ends"><span>0 = Маш муу</span><span>10 = Маш сайн</span></div>
             </fieldset>
 
             <fieldset class="score-field">
-              <legend>作业量</legend>
-              <div class="score-seg" data-for="formWorkloadScore" role="radiogroup" aria-label="作业量 0–10"></div>
+              <legend>Даалгаврын ачаалал<span class="cn">作业量</span></legend>
+              <div class="score-seg" data-for="formWorkloadScore" role="radiogroup" aria-label="Даалгаврын ачаалал 0–10"></div>
               <div class="slider-row">
-                <input type="range" id="formWorkloadScore" class="score-slider" min="0" max="10" step="1" value="5" aria-label="作业量" />
+                <input type="range" id="formWorkloadScore" class="score-slider" min="0" max="10" step="1" value="5" aria-label="Даалгаврын ачаалал" />
                 <output class="slider-value" id="formWorkloadScoreValue">5</output>
               </div>
-              <div class="score-ends"><span>0 = 几乎没作业</span><span>10 = 作业很多</span></div>
+              <div class="score-ends"><span>0 = Бараг байхгүй</span><span>10 = Маш их</span></div>
             </fieldset>
 
             <fieldset class="score-field">
-              <legend>给分</legend>
-              <div class="score-seg" data-for="formGradingScore" role="radiogroup" aria-label="给分 0–10"></div>
+              <legend>Дүн тавилт<span class="cn">给分</span></legend>
+              <div class="score-seg" data-for="formGradingScore" role="radiogroup" aria-label="Дүн тавилт 0–10"></div>
               <div class="slider-row">
-                <input type="range" id="formGradingScore" class="score-slider" min="0" max="10" step="1" value="5" aria-label="给分" />
+                <input type="range" id="formGradingScore" class="score-slider" min="0" max="10" step="1" value="5" aria-label="Дүн тавилт" />
                 <output class="slider-value" id="formGradingScoreValue">5</output>
               </div>
-              <div class="score-ends"><span>0 = 给分很低</span><span>10 = 给分很高</span></div>
+              <div class="score-ends"><span>0 = Маш хатуу</span><span>10 = Маш өгөөмөр</span></div>
             </fieldset>
 
             <div class="form-group">
-              <label for="formTakenSemester">你哪个学期上的 <span class="optional">选填</span></label>
+              <label for="formTakenSemester">Аль улиралд үзсэн бэ <span class="optional">заавал биш</span></label>
               <select id="formTakenSemester"></select>
             </div>
 
             <div class="form-group">
-              <label for="formComment">评论 <span class="optional">选填</span></label>
-              <textarea id="formComment" placeholder="关于课程的想法..." rows="4"></textarea>
+              <label for="formComment">Сэтгэгдэл <span class="optional">заавал биш</span></label>
+              <textarea id="formComment" placeholder="Хичээлийн талаарх бодлоо бичээрэй..." rows="4"></textarea>
             </div>
 
             <div class="checkbox-group">
               <input type="checkbox" id="formAnonymous" />
-              <label for="formAnonymous">匿名显示</label>
+              <label for="formAnonymous">Нэрээ нууж харуулах<span class="cn">匿名</span></label>
             </div>
 
             <!-- 补充信息（可选，默认收起） -->
             <button type="button" class="details-toggle" id="toggleDetailsBtn" aria-expanded="false" aria-controls="reviewDetails">
               <span class="details-toggle-main">
                 <svg class="icon chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                <span>补充考试与作业信息</span>
+                <span>Шалгалт, даалгаврын нэмэлт мэдээлэл</span>
               </span>
-              <span class="optional">选填</span>
+              <span class="optional">заавал биш</span>
             </button>
             <div class="details-panel" id="reviewDetails">
               <div class="details-group">
-                <div class="details-group-title">考试</div>
+                <div class="details-group-title">Шалгалт</div>
                 <div class="toggle-item" data-key="midterm">
                   <label class="toggle-head">
-                    <span class="toggle-name">期中考试</span>
+                    <span class="toggle-name">Дунд шалгалт<span class="cn">期中考试</span></span>
                     <span class="switch">
-                      <span class="switch-caption">无</span>
+                      <span class="switch-caption">Үгүй</span>
                       <input type="checkbox" id="hasMidterm" role="switch" />
                       <span class="switch-track" aria-hidden="true"></span>
                     </span>
                   </label>
                   <div class="toggle-detail"><div class="toggle-detail-inner">
-                    <input type="text" id="formMidterm" aria-label="期中考试 详情" placeholder="会考什么？例如：闭卷、开卷、提交论文" />
+                    <input type="text" id="formMidterm" aria-label="Дунд шалгалт — дэлгэрэнгүй" placeholder="Юу шалгадаг вэ? Жишээ нь: хаалттай, нээлттэй, эссэ" />
                   </div></div>
                 </div>
                 <div class="toggle-item" data-key="final">
                   <label class="toggle-head">
-                    <span class="toggle-name">期末考试</span>
+                    <span class="toggle-name">Эцсийн шалгалт<span class="cn">期末考试</span></span>
                     <span class="switch">
-                      <span class="switch-caption">无</span>
+                      <span class="switch-caption">Үгүй</span>
                       <input type="checkbox" id="hasFinal" role="switch" />
                       <span class="switch-track" aria-hidden="true"></span>
                     </span>
                   </label>
                   <div class="toggle-detail"><div class="toggle-detail-inner">
-                    <input type="text" id="formFinal" aria-label="期末考试 详情" placeholder="会考什么？例如：闭卷、开卷、提交论文" />
+                    <input type="text" id="formFinal" aria-label="Эцсийн шалгалт — дэлгэрэнгүй" placeholder="Юу шалгадаг вэ? Жишээ нь: хаалттай, нээлттэй, эссэ" />
                   </div></div>
                 </div>
               </div>
 
               <div class="details-group">
-                <div class="details-group-title">任务</div>
+                <div class="details-group-title">Даалгавар</div>
                 <div class="toggle-item" data-key="homework">
                   <label class="toggle-head">
-                    <span class="toggle-name">作业</span>
+                    <span class="toggle-name">Гэрийн даалгавар<span class="cn">作业</span></span>
                     <span class="switch">
-                      <span class="switch-caption">无</span>
+                      <span class="switch-caption">Үгүй</span>
                       <input type="checkbox" id="hasHomework" role="switch" />
                       <span class="switch-track" aria-hidden="true"></span>
                     </span>
                   </label>
                   <div class="toggle-detail"><div class="toggle-detail-inner">
-                    <input type="text" id="formHomework" aria-label="作业 详情" placeholder="例如：每天 / 每周一次" />
+                    <input type="text" id="formHomework" aria-label="Гэрийн даалгавар — дэлгэрэнгүй" placeholder="Жишээ нь: өдөр бүр / долоо хоногт нэг" />
                   </div></div>
                 </div>
                 <div class="toggle-item" data-key="attendance">
                   <label class="toggle-head">
-                    <span class="toggle-name">考勤</span>
+                    <span class="toggle-name">Ирц<span class="cn">考勤</span></span>
                     <span class="switch">
-                      <span class="switch-caption">无</span>
+                      <span class="switch-caption">Үгүй</span>
                       <input type="checkbox" id="hasAttendance" role="switch" />
                       <span class="switch-track" aria-hidden="true"></span>
                     </span>
                   </label>
                   <div class="toggle-detail"><div class="toggle-detail-inner">
-                    <input type="text" id="formAttendance" aria-label="考勤 详情" placeholder="例如：缺勤3次不能参加考试" />
+                    <input type="text" id="formAttendance" aria-label="Ирц — дэлгэрэнгүй" placeholder="Жишээ нь: 3 удаа тасалбал шалгалт өгөхгүй" />
                   </div></div>
                 </div>
                 <div class="toggle-item" data-key="groupwork">
                   <label class="toggle-head">
-                    <span class="toggle-name">小组作业</span>
+                    <span class="toggle-name">Багийн даалгавар<span class="cn">小组作业</span></span>
                     <span class="switch">
-                      <span class="switch-caption">无</span>
+                      <span class="switch-caption">Үгүй</span>
                       <input type="checkbox" id="hasGroupwork" role="switch" />
                       <span class="switch-track" aria-hidden="true"></span>
                     </span>
                   </label>
                   <div class="toggle-detail"><div class="toggle-detail-inner">
-                    <input type="text" id="formGroupwork" aria-label="小组作业 详情" placeholder="例如：报告" />
+                    <input type="text" id="formGroupwork" aria-label="Багийн даалгавар — дэлгэрэнгүй" placeholder="Жишээ нь: илтгэл" />
                   </div></div>
                 </div>
                 <div class="toggle-item" data-key="bigassignment">
                   <label class="toggle-head">
-                    <span class="toggle-name">大作业</span>
+                    <span class="toggle-name">Том даалгавар<span class="cn">大作业</span></span>
                     <span class="switch">
-                      <span class="switch-caption">无</span>
+                      <span class="switch-caption">Үгүй</span>
                       <input type="checkbox" id="hasBigassignment" role="switch" />
                       <span class="switch-track" aria-hidden="true"></span>
                     </span>
                   </label>
                   <div class="toggle-detail"><div class="toggle-detail-inner">
-                    <input type="text" id="formBigassignment" aria-label="大作业 详情" placeholder="例如：论文" />
+                    <input type="text" id="formBigassignment" aria-label="Том даалгавар — дэлгэрэнгүй" placeholder="Жишээ нь: эссэ" />
                   </div></div>
                 </div>
               </div>
 
               <div class="details-group">
-                <label class="details-group-title" for="formGradingRatio">分数比例（每门课都有）</label>
-                <input type="text" id="formGradingRatio" placeholder="例如：出勤20% + 期中30% + 期末50%" />
+                <label class="details-group-title" for="formGradingRatio">Дүнгийн бүрдэл<span class="cn">分数比例</span></label>
+                <input type="text" id="formGradingRatio" placeholder="Жишээ нь: ирц 20% + дунд 30% + эцсийн 50%" />
               </div>
             </div>
 
             <div class="form-actions">
-              <button class="btn btn-primary" id="submitReviewBtn">提交评价</button>
-              <button class="btn btn-secondary" id="cancelEditBtn" style="display:none;">取消修改</button>
+              <button class="btn btn-primary" id="submitReviewBtn">Үнэлгээ илгээх</button>
+              <button class="btn btn-secondary" id="cancelEditBtn" style="display:none;">Засварыг цуцлах</button>
             </div>
           </div>
         </section>
@@ -391,11 +411,11 @@
       <div class="modal-body">
         <div class="form-group">
           <label for="newCourseName">Хичээлийн нэр (хятадаар)</label>
-          <input type="text" id="newCourseName" placeholder="例如：中国历史文选" />
+          <input type="text" id="newCourseName" placeholder="Жишээ нь: 中国历史文选" />
         </div>
         <div class="form-group">
           <label for="newCourseTeacher">Багш</label>
-          <input type="text" id="newCourseTeacher" placeholder="例如：王铿" required aria-required="true" />
+          <input type="text" id="newCourseTeacher" placeholder="Жишээ нь: 王铿" required aria-required="true" />
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -428,6 +448,7 @@
   </div>
 
   <script src="app.js"></script>
+  <script src="motion.js"></script>
 </body>
 
 </html>

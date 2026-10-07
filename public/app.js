@@ -22,6 +22,7 @@ const ICON_PATHS = {
   calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 2v4"/><path d="M16 2v4"/>',
   credit: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
   send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
 };
 
 function icon(name, size = 16, extra = '') {
@@ -160,12 +161,12 @@ function buildSemesterOptions() {
   // Spring runs into summer, so before August the current year's autumn
   // term hasn't happened yet.
   const startYear = now.getMonth() >= 7 ? year : year - 1;
-  const opts = ['<option value="">— 选填 —</option>'];
+  const opts = ['<option value="">— Сонгох —</option>'];
   for (let y = startYear; y > startYear - 5; y--) {
     opts.push(`<option value="${y} 秋季">${y} 秋季</option>`);
     opts.push(`<option value="${y} 春季">${y} 春季</option>`);
   }
-  opts.push('<option value="更早">更早 / 记不清了</option>');
+  opts.push('<option value="更早">Түүнээс өмнө / санахгүй байна</option>');
   formTakenSemester.innerHTML = opts.join('');
 }
 buildSemesterOptions();
@@ -185,7 +186,7 @@ function updateScoreSlider(input) {
   const value = parseInt(input.value, 10);
   const pct = (value / 10) * 100;
   input.style.background =
-    `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, #ddd5c7 ${pct}%, #ddd5c7 100%)`;
+    `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, var(--track) ${pct}%, var(--track) 100%)`;
   const valueEl = document.getElementById(input.id + 'Value');
   if (valueEl) valueEl.textContent = value;
   // Keep the 0–10 buttons (desktop) in step with the slider (phone).
@@ -260,7 +261,7 @@ function setToggle(cbId, on) {
   if (item) {
     item.classList.toggle('on', on);
     const caption = item.querySelector('.switch-caption');
-    if (caption) caption.textContent = on ? '有' : '无';
+    if (caption) caption.textContent = on ? 'Тийм' : 'Үгүй';
   }
 }
 
@@ -368,14 +369,94 @@ async function loadCourses() {
   if (res.success) {
     allCourses = res.data;
     await loadMyReviews();
+    renderPageStats();
     renderCategoryFilter();
-    applyFilters();
+    revealActiveCategory();
+    applyFilters({ keepLimit: true });
   } else {
     courseListEl.innerHTML = `<div class="empty-state">${icon('info', 32)}<p>Ачаалахад алдаа гарлаа: ${escapeHtml(res.error)}</p></div>`;
   }
 }
 
+// ~240 courses is too long a page, so the grid shows them in batches of
+// PAGE_SIZE with a "Цааш үзэх" button. Search and the category filter still
+// look through every course; only the drawing is limited.
+const PAGE_SIZE = 24;
+let shownLimit = PAGE_SIZE;
+let lastFiltered = [];
+
+function moreButtonHtml() {
+  const left = lastFiltered.length - shownLimit;
+  if (left <= 0) return '';
+  return `<div class="load-more"><button type="button" class="btn btn-secondary" id="loadMoreBtn">Цааш үзэх<span class="load-more-count">${left} хичээл үлдлээ</span></button></div>`;
+}
+
+function showMoreCourses() {
+  const start = shownLimit;
+  shownLimit += PAGE_SIZE;
+  const wrap = courseListEl.querySelector('.load-more');
+  const cards = lastFiltered.slice(start, shownLimit).map(courseCardHtml).join('');
+  if (wrap) wrap.insertAdjacentHTML('beforebegin', cards);
+  if (wrap) wrap.remove();
+  courseListEl.insertAdjacentHTML('beforeend', moreButtonHtml());
+  // Keep keyboard users in place: focus the button again, or the first new card.
+  const btn = document.getElementById('loadMoreBtn');
+  if (btn) btn.focus({ preventScroll: true });
+  else { const first = courseListEl.querySelectorAll('.course-card')[start]; if (first) first.focus({ preventScroll: true }); }
+}
+
+courseListEl.addEventListener('click', (e) => {
+  if (e.target.closest('#loadMoreBtn')) { showMoreCourses(); return; }
+  const empty = e.target.closest('[data-empty]');
+  if (!empty) return;
+  if (empty.dataset.empty === 'all') {
+    activeCategory = '';
+    activeSubCategory = '';
+    saveCategory();
+    renderCategoryFilter();
+    applyFilters();
+  } else {
+    const q = searchInput.value.trim();
+    openAddCourse();
+    // Start the new course with the name they were searching for.
+    if (q && addCourseOverlay.classList.contains('active') && !newCourseName.value) newCourseName.value = q;
+  }
+});
+
+// ===== Header stats: "235 хичээл · 48 үнэлгээ" =====
+function renderPageStats() {
+  const el = document.getElementById('pageStats');
+  if (!el) return;
+  const reviews = allCourses.reduce((n, c) => n + (Number(c.review_count) || 0), 0);
+  el.innerHTML = `<strong>${allCourses.length}</strong> хичээл · <strong>${reviews}</strong> үнэлгээ`;
+  el.hidden = false;
+}
+
+// ===== Sorting =====
+const SORT_KEY = 'mnsa_sort';
+const sortSelect = document.getElementById('sortSelect');
+try {
+  const saved = localStorage.getItem(SORT_KEY);
+  if (sortSelect && saved && [...sortSelect.options].some(o => o.value === saved)) sortSelect.value = saved;
+} catch (_) { /* storage blocked */ }
+function sortCourses(list) {
+  const mode = sortSelect ? sortSelect.value : 'reviews';
+  const reviews = (c) => Number(c.review_count) || 0;
+  const score = (c) => (c.avg_score === null || c.avg_score === undefined) ? -1 : Number(c.avg_score);
+  const name = (c) => c.name_cn || c.name_en || '';
+  const copy = list.slice();
+  if (mode === 'score') copy.sort((a, b) => score(b) - score(a) || reviews(b) - reviews(a) || a.id - b.id);
+  else if (mode === 'name') copy.sort((a, b) => name(a).localeCompare(name(b), 'zh-Hans-CN-u-co-pinyin'));
+  else copy.sort((a, b) => reviews(b) - reviews(a) || a.id - b.id);
+  return copy;
+}
+if (sortSelect) sortSelect.addEventListener('change', () => {
+  try { localStorage.setItem(SORT_KEY, sortSelect.value); } catch (_) {}
+  applyFilters();
+});
+
 function renderCourses(courses) {
+  lastFiltered = courses || [];
   const total = (courses || []).length;
   if (courseCount) {
     const base = total === allCourses.length ? `${total} хичээл` : `${total} / ${allCourses.length} хичээл`;
@@ -387,10 +468,24 @@ function renderCourses(courses) {
       : '';
   }
   if (!courses || courses.length === 0) {
-    courseListEl.innerHTML = `<div class="empty-state">${icon('inbox', 38)}<p>Хичээл олдсонгүй</p></div>`;
+    // Say what was searched for, and offer the two ways forward: look in
+    // every category (the remembered one may be hiding it), or add it.
+    const q = searchInput.value.trim();
+    const msg = q
+      ? `${activeCategory ? 'Энэ ангилалд ' : ''}“${escapeHtml(q)}” гэсэн хичээл олдсонгүй`
+      : 'Хичээл олдсонгүй';
+    courseListEl.innerHTML = `<div class="empty-state">${icon('inbox', 38)}<p>${msg}</p>
+      <div class="empty-actions">
+        ${activeCategory ? `<button type="button" class="btn btn-secondary btn-sm" data-empty="all">${icon('search', 16)} Бүх ангиллаас хайх</button>` : ''}
+        <button type="button" class="btn btn-primary btn-sm" data-empty="add">${icon('plus', 16)} Хичээл нэмэх</button>
+      </div></div>`;
     return;
   }
-  courseListEl.innerHTML = courses.map((c) => {
+  courseListEl.innerHTML = courses.slice(0, shownLimit).map(courseCardHtml).join('') + moreButtonHtml();
+}
+
+function courseCardHtml(c) {
+  {
     const credits = (c.credits !== null && c.credits !== undefined && c.credits !== '')
       ? `${c.credits} кредит`
       : '— кредит';
@@ -402,7 +497,7 @@ function renderCourses(courses) {
     // "no reviews" hides reviews that do exist.
     let ratingHtml;
     if (reviewCount === 0) {
-      ratingHtml = `<div class="course-rating empty"><span>Одоохондоо үнэлгээ байхгүй</span><span class="first-review">Эхний үнэлгээг өгөх</span></div>`;
+      ratingHtml = `<div class="course-rating empty"><span>Үнэлгээгүй</span></div>`;
     } else if (avgScore === null) {
       ratingHtml = `<div class="course-rating"><span>${reviewCount} үнэлгээ</span></div>`;
     } else {
@@ -430,7 +525,7 @@ function renderCourses(courses) {
   </div>
 </a>
   `;
-  }).join('');
+  }
 }
 
 // Searching for who built this — in any of the three languages the site
@@ -470,6 +565,20 @@ const COURSE_CATEGORIES = [
 const DEFAULT_CATEGORY = '与中国有关课程';
 let activeCategory = '';      // '' = all, or a top-level value
 let activeSubCategory = '';   // '' = all 通识课, or 通识课一 …
+
+// The last category a student picked opens again on their next visit.
+const CATEGORY_KEY = 'mnsa_category';
+try {
+  const saved = JSON.parse(localStorage.getItem(CATEGORY_KEY) || 'null');
+  const top = saved && COURSE_CATEGORIES.find(c => c.value === saved.top);
+  if (top) {
+    activeCategory = top.value;
+    activeSubCategory = (top.subs && top.subs.includes(saved.sub)) ? saved.sub : '';
+  }
+} catch (_) { /* storage blocked or bad data: start from 'all' */ }
+function saveCategory() {
+  try { localStorage.setItem(CATEGORY_KEY, JSON.stringify({ top: activeCategory, sub: activeSubCategory })); } catch (_) {}
+}
 
 const categoryFilterEl = document.getElementById('categoryFilter');
 
@@ -515,6 +624,30 @@ function renderCategoryFilter() {
       ? catGroup(c, count)
       : catButton(c.value, c.label, activeCategory === c.value, count(c.value), 'top')),
   ].join('');
+  updateFilterFade();
+}
+
+// On phones the category row scrolls sideways; fade whichever edge has more
+// buttons behind it so it's obvious the row continues.
+function updateFilterFade() {
+  const el = categoryFilterEl;
+  const max = el.scrollWidth - el.clientWidth;
+  el.classList.toggle('fade-right', max > 2 && el.scrollLeft < max - 2);
+  el.classList.toggle('fade-left', max > 2 && el.scrollLeft > 2);
+}
+categoryFilterEl.addEventListener('scroll', updateFilterFade, { passive: true });
+window.addEventListener('resize', updateFilterFade);
+
+// A remembered category may sit off-screen in that row; bring it into view.
+function revealActiveCategory() {
+  const on = categoryFilterEl.querySelector('[aria-pressed="true"], .cat-parent');
+  if (!on) return;
+  const box = categoryFilterEl.getBoundingClientRect();
+  const r = on.getBoundingClientRect();
+  if (r.left < box.left || r.right > box.right) {
+    categoryFilterEl.scrollLeft += r.left - box.left - 24;
+  }
+  updateFilterFade();
 }
 
 function onCategoryClick(e) {
@@ -529,13 +662,17 @@ function onCategoryClick(e) {
     activeCategory = '通识课';
     activeSubCategory = activeSubCategory === btn.dataset.value ? '' : btn.dataset.value;
   }
+  saveCategory();
   renderCategoryFilter();
   applyFilters();
 }
 categoryFilterEl.addEventListener('click', onCategoryClick);
 
 // Search text and category filter work together.
-function applyFilters() {
+function applyFilters(opts) {
+  // A new search or category starts from the top again; a background
+  // refresh (after posting a review) keeps the cards already shown.
+  if (!(opts && opts.keepLimit)) shownLimit = PAGE_SIZE;
   const query = searchInput.value.toLowerCase().trim();
   if (query && AUTHOR_KEYWORDS.includes(query)) { renderSignature(); return; }
   const filtered = allCourses.filter(c =>
@@ -548,10 +685,10 @@ function applyFilters() {
       (isCore(c) && '核心课'.includes(query)) ||
       (c.semester || '').toLowerCase().includes(query))
   );
-  renderCourses(filtered);
+  renderCourses(sortCourses(filtered));
 }
 
-searchInput.addEventListener('input', applyFilters);
+searchInput.addEventListener('input', () => applyFilters());
 
 // ===== Course Detail & Reviews =====
 async function openCourseDetail(course) {
@@ -587,6 +724,7 @@ async function openCourseDetail(course) {
   // writes a second review by accident.
   const existing = myReviews.get(course.id);
   if (currentUser && existing) fillEditForm(existing);
+  else restoreDraft();
 
   updateReviewFormVisibility();
   modalOverlay.classList.add('active');
@@ -594,6 +732,44 @@ async function openCourseDetail(course) {
   modalCloseBtn.focus({ preventScroll: true });
   await loadReviews(course.id);
 }
+
+// ===== Share a course =====
+// Phones get the system share sheet (WeChat, Telegram …); computers copy the
+// link. The #course-<id> address opens the course directly.
+const shareCourseBtn = document.getElementById('shareCourseBtn');
+if (shareCourseBtn) shareCourseBtn.addEventListener('click', async () => {
+  if (!currentCourse) return;
+  const url = `${location.origin}${location.pathname}#course-${currentCourse.id}`;
+  if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+    try { await navigator.share({ title: currentCourse.name_cn || document.title, url }); } catch (_) { /* cancelled */ }
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Холбоос хуулагдлаа', 'success');
+  } catch (_) {
+    showToast('Хуулж чадсангүй. Хаягийн мөрөөс хуулна уу.', 'error');
+  }
+});
+
+// ===== Light / dark theme =====
+// Without a choice the site follows the device. The button stores a choice;
+// index.html applies it before the first paint.
+const themeBtn = document.getElementById('themeBtn');
+function setThemeColorMeta(dark) {
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = dark ? '#1b1916' : '#f5f1ea'; });
+}
+function isDarkTheme() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+if (document.documentElement.dataset.theme) setThemeColorMeta(isDarkTheme());
+if (themeBtn) themeBtn.addEventListener('click', () => {
+  const next = isDarkTheme() ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  setThemeColorMeta(next === 'dark');
+  try { localStorage.setItem('mnsa_theme', next); } catch (_) {}
+});
 
 // ===== Course URL routing (#course-<id>) =====
 // True when the visitor arrived straight on a course link: there is no list
@@ -674,30 +850,35 @@ async function loadReviews(courseId) {
 // other way, since less homework is the good case.
 const VERDICTS = {
   content: {
-    label: '内容',
+    label: 'Агуулга',
+    cn: '内容',
     tiers: [
-      { max: 3, text: '内容特别差', tone: 'bad' },
-      { max: 6, text: '内容中等', tone: 'mid' },
-      { max: 10, text: '内容特别好', tone: 'good' },
+      { max: 3, text: 'Агуулга муу', tone: 'bad' },
+      { max: 6, text: 'Дунд зэрэг', tone: 'mid' },
+      { max: 10, text: 'Агуулга сайн', tone: 'good' },
     ],
   },
   workload: {
-    label: '作业量',
+    label: 'Даалгавар',
+    cn: '作业量',
     tiers: [
-      { max: 3, text: '作业特别少', tone: 'good' },
-      { max: 6, text: '作业中等', tone: 'mid' },
-      { max: 10, text: '作业特别多', tone: 'bad' },
+      { max: 3, text: 'Даалгавар бага', tone: 'good' },
+      { max: 6, text: 'Дунд зэрэг', tone: 'mid' },
+      { max: 10, text: 'Даалгавар их', tone: 'bad' },
     ],
   },
   grading: {
-    label: '给分',
+    label: 'Дүн тавилт',
+    cn: '给分',
     tiers: [
-      { max: 3, text: '给分特别差', tone: 'bad' },
-      { max: 6, text: '给分中等', tone: 'mid' },
-      { max: 10, text: '给分特别好', tone: 'good' },
+      { max: 3, text: 'Дүн хатуу', tone: 'bad' },
+      { max: 6, text: 'Дунд зэрэг', tone: 'mid' },
+      { max: 10, text: 'Дүн өгөөмөр', tone: 'good' },
     ],
   },
 };
+// The Mongolian label with the Chinese term students know, set small.
+const labelHtml = (spec) => `${spec.label}<span class="cn">${spec.cn}</span>`;
 
 // An unscored dimension renders nothing rather than an empty placeholder.
 function verdictChip(kind, score) {
@@ -716,12 +897,12 @@ function verdictChip(kind, score) {
 function scoreTile(kind, score) {
   const spec = VERDICTS[kind];
   if (score === null || score === undefined || score === '' || isNaN(score)) {
-    return `<div class="score-tile score-none"><span class="score-label">${spec.label}</span><span class="score-num">—</span><span class="score-verdict">Оноо өгөөгүй</span></div>`;
+    return `<div class="score-tile score-none"><span class="score-label">${labelHtml(spec)}</span><span class="score-num">—</span><span class="score-verdict">Оноо өгөөгүй</span></div>`;
   }
   const n = Number(score);
   const tier = tierFor(kind, n);
   return `<div class="score-tile tone-${tier.tone}">
-      <span class="score-label">${spec.label}</span>
+      <span class="score-label">${labelHtml(spec)}</span>
       <span class="score-num">${n}<small>/10</small></span>
       <span class="score-verdict">${verdictSymbol(tier.tone)}${tier.text}</span>
     </div>`;
@@ -755,13 +936,14 @@ function renderSummary(reviews) {
   }
   courseSummary.innerHTML = tiles.map(({ kind, value }) => {
     const label = VERDICTS[kind].label;
+    const shown = labelHtml(VERDICTS[kind]);
     if (value === null) {
-      return `<div class="stat"><span class="stat-label">${label}</span><span class="stat-value"><span class="stat-num">—</span></span></div>`;
+      return `<div class="stat"><span class="stat-label">${shown}</span><span class="stat-value"><span class="stat-num">—</span></span></div>`;
     }
     const tier = tierFor(kind, value);
     return `
   <div class="stat">
-    <span class="stat-label">${label}</span>
+    <span class="stat-label">${shown}</span>
     <span class="stat-value">
       <span class="stat-num">${value.toFixed(1)}</span>
       <span class="verdict verdict-${tier.tone}">${verdictSymbol(tier.tone)}${tier.text}</span>
@@ -834,14 +1016,16 @@ function renderReviews(reviews) {
     const isAuthor = currentUser && r.author_id === currentUser.id;
     const isAnon = r.is_anonymous === 1 || r.is_anonymous === true;
     const authorName = r.name || 'Нэргүй';
+    // '有' is stored when someone said "yes" without details.
+    const said = (v) => String(v).trim() === '有' ? 'Байсан' : v;
     const infoLines = [
-      r.midterm ? { k: '期中考试', v: r.midterm } : null,
-      r.final ? { k: '期末考试', v: r.final } : null,
-      r.homework ? { k: '作业', v: r.homework } : null,
-      r.attendance ? { k: '考勤', v: r.attendance } : null,
-      r.groupwork ? { k: '小组作业', v: r.groupwork } : null,
-      r.bigassignment ? { k: '大作业', v: r.bigassignment } : null,
-      r.grading_ratio ? { k: '分数比例', v: r.grading_ratio } : null,
+      r.midterm ? { k: 'Дунд шалгалт', v: said(r.midterm) } : null,
+      r.final ? { k: 'Эцсийн шалгалт', v: said(r.final) } : null,
+      r.homework ? { k: 'Гэрийн даалгавар', v: said(r.homework) } : null,
+      r.attendance ? { k: 'Ирц', v: said(r.attendance) } : null,
+      r.groupwork ? { k: 'Багийн даалгавар', v: said(r.groupwork) } : null,
+      r.bigassignment ? { k: 'Том даалгавар', v: said(r.bigassignment) } : null,
+      r.grading_ratio ? { k: 'Дүнгийн бүрдэл', v: r.grading_ratio } : null,
     ].filter(Boolean);
     return `
   <article class="review-item${r.comment ? '' : ' no-comment'}" data-id="${r.id}">
@@ -951,6 +1135,78 @@ function fillEditForm(review) {
   cancelEditBtn.style.display = 'inline-flex';
 }
 
+// ===== Review drafts =====
+// A half-written review is kept in this browser (per course) until it is
+// sent, so closing the window by accident doesn't lose a long comment.
+const DRAFT_PREFIX = 'mnsa_draft_';
+const DRAFT_MAX_AGE = 60 * 24 * 60 * 60 * 1000; // 60 days
+let draftTimer = null;
+
+function draftKey() { return currentCourse ? DRAFT_PREFIX + currentCourse.id : null; }
+
+function collectDraft() {
+  return {
+    scores: [formContentScore.value, formWorkloadScore.value, formGradingScore.value],
+    toggles: toggleFieldConfig.map(({ cb, input }) => [document.getElementById(cb).checked, document.getElementById(input).value]),
+    ratio: formGradingRatio.value,
+    comment: formComment.value,
+    anon: formAnonymous.checked,
+    term: formTakenSemester.value,
+    teacher: teacherField.hidden ? '' : formTeacher.value,
+    at: Date.now(),
+  };
+}
+
+// Only worth keeping once something has actually been written or switched on.
+function draftHasContent(d) {
+  return !!(d.comment.trim() || d.ratio.trim() || d.toggles.some(([on, v]) => on || v.trim()));
+}
+
+function saveDraftSoon() {
+  if (editingReviewId || !currentCourse) return; // edits already live on the server
+  const key = draftKey();
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const d = collectDraft();
+    try {
+      if (draftHasContent(d)) localStorage.setItem(key, JSON.stringify(d));
+      else localStorage.removeItem(key);
+    } catch (_) { /* storage full or blocked: nothing to do */ }
+  }, 400);
+}
+
+function clearDraft() {
+  clearTimeout(draftTimer);
+  const key = draftKey();
+  try { if (key) localStorage.removeItem(key); } catch (_) {}
+}
+
+function restoreDraft() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch (_) { return; }
+  if (!d || !Array.isArray(d.scores) || !Array.isArray(d.toggles)) return;
+  if (Date.now() - (d.at || 0) > DRAFT_MAX_AGE) { clearDraft(); return; }
+  setScoreSlider('formContentScore', d.scores[0]);
+  setScoreSlider('formWorkloadScore', d.scores[1]);
+  setScoreSlider('formGradingScore', d.scores[2]);
+  toggleFieldConfig.forEach(({ cb, input }, i) => {
+    const [on, v] = d.toggles[i] || [false, ''];
+    setToggle(cb, !!on);
+    document.getElementById(input).value = v || '';
+  });
+  formGradingRatio.value = d.ratio || '';
+  formComment.value = d.comment || '';
+  formAnonymous.checked = !!d.anon;
+  if ([...formTakenSemester.options].some(o => o.value === d.term)) formTakenSemester.value = d.term;
+  if (!teacherField.hidden && [...formTeacher.options].some(o => o.value === d.teacher)) formTeacher.value = d.teacher;
+  if (d.ratio || d.toggles.some(([on, v]) => on || v)) setDetailsOpen(true);
+  showToast('Өмнө бичиж байсан ноорог тань сэргээгдлээ', 'info');
+}
+
+reviewFormArea.addEventListener('input', saveDraftSoon);
+reviewFormArea.addEventListener('change', saveDraftSoon);
+reviewFormArea.addEventListener('click', (e) => { if (e.target.closest('.score-seg')) saveDraftSoon(); });
+
 async function submitReview() {
   if (!currentUser) {
     showToast('Эхлээд нэвтэрнэ үү!', 'error');
@@ -998,6 +1254,7 @@ async function submitReview() {
     }
 
     if (res.success) {
+      clearDraft();
       // res.data.updated means the API found an existing review and
       // updated it rather than adding a second one.
       const wasUpdate = wasEditing || (res.data && res.data.updated);
